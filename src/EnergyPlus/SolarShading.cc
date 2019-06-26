@@ -49,6 +49,9 @@
 #include <cassert>
 #include <cmath>
 #include <memory>
+#include <chrono>
+#include <fstream>
+#include <iostream>
 
 // ObjexxFCL Headers
 #include <ObjexxFCL/Array.functions.hh>
@@ -171,6 +174,8 @@ namespace SolarShading {
     int const PartialOverlap(4);
     int const TooManyVertices(5);
     int const TooManyFigures(6);
+
+    
     Array1D_string const
         cOverLapStatus(6, {"No-Overlap", "1st-Surf-within-2nd", "2nd-Surf-within-1st", "Partial-Overlap", "Too-Many-Vertices", "Too-Many-Figures"});
 
@@ -3830,6 +3835,257 @@ namespace SolarShading {
         }
     }
 
+    void CLIPRECT(int const NS1, int const NS2, int const NV1, int &NV3) {
+        typedef Array2D<Int64>::size_type size_type;
+
+        auto l(HCA.index(NS2, 1));
+        Real64 maxX = HCX[l];
+        Real64 minX = HCX[l];
+        Real64 maxY = HCY[l];
+        Real64 minY = HCY[l];
+        for (int E = 1; E <= 4; ++E, ++l) {
+            if (HCX[l] > maxX) {
+                maxX = HCX[l];
+            }
+            if (HCX[l] < minX) {
+                minX = HCX[l];
+            }
+            if (HCY[l] > maxY) {
+                maxY = HCY[l];
+            }
+            if (HCY[l] < minY) {
+                minY = HCY[l];
+            }
+        }
+
+
+        for (int P = 1; P <= NV1; ++P) {
+            XTEMP1(P) = XTEMP(P);
+            YTEMP1(P) = YTEMP(P);
+        }
+        Real64 arrx[40];
+        Real64 arry[40];
+        int arrc = 0;
+        //loop over lines in subject polygon (XTEMP)
+        //
+        for (size_type j = 0, l = HCX.index(NS1, 1), e = NV1; j < e; ++j, ++l) {
+            //grab line endpoints
+            Real64 x1 = XTEMP1[j];
+            Real64 y1 = YTEMP1[j];
+            Real64 x2;
+            Real64 y2;
+            if (j + 1 >= e) {
+                x2 = XTEMP1[0];
+                y2 = YTEMP1[0];
+            } else {
+                x2 = XTEMP1[j+1];
+                y2 = YTEMP1[j+1];
+            }
+
+            Real64 p1 = -1*(x2 - x1);
+            Real64 p2 = -1*p1;
+            Real64 p3 = -1*(y2 - y1);
+            Real64 p4 = -1*p3;
+
+            Real64 q1 = x1 - minX;
+            Real64 q2 = maxX - x1;
+            Real64 q3 = y1 - minY;
+            Real64 q4 = maxY - y1;
+
+            Real64 minP = 1;
+            Real64 maxP = 0;
+
+            
+            if ((p1 == 0 && (q1 < 0 || q2 < 0)) || (p3 == 0 && (q3 < 0 || q4 < 0))) {
+                continue;
+            }
+            
+
+            if (p1 != 0) {
+                Real64 r1 = q1 / p1;
+                Real64 r2 = q2 / p2;
+                if (p1 < 0) {
+                    if (r1 > maxP) {
+                        maxP = r1;
+                    }
+                    if (r2 < minP) {
+                        minP =  r2;
+                    }
+                } else {
+                    if (r2 > maxP) {
+                        maxP =  r2;
+                    }
+                    if (r1 < minP) {
+                        minP = r1;
+                    }
+                }
+            }
+
+            if (p3 != 0) {
+                Real64 r3 = q3 / p3;
+                Real64 r4 = q4 / p4;
+                if (p3 < 0) {
+                    maxP = r3 > maxP ? r3 : maxP;
+                    minP = r4 < minP ? r4 : minP;
+                } else {
+                    maxP = r4 > maxP ? r4 : maxP;
+                    minP = r3 < minP ? r3 : minP;
+                }
+            }
+
+            if (maxP > minP) { //reject
+                continue;
+            }
+
+
+            Real64 x_1 = x1 + p2 * maxP;
+            Real64 y_1 = y1 + p4 * maxP;
+            if (arrc == 0 || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
+                arrx[arrc] = x_1;
+                arry[arrc] = y_1;
+                arrc += 1;
+            }
+            x_1 = x1 + p2 * minP;
+            y_1 =  y1 + p4 * minP;
+            if (arrc == 0 || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
+                arrx[arrc] = x_1;
+                arry[arrc] = y_1;
+                arrc += 1;
+            }
+        }
+
+        //make uniq list of points -- potential source of error here, when slight error causes points
+        // that are supposed to be the same are both kept
+        Real64 thresh = 10;
+        int incr = 0;
+        for (int p_1 = 0; p_1 < arrc; p_1++) {
+            bool flag = true;
+            for (int p_2 = 0; p_2 < p_1; p_2++) {
+                if (std::abs(arrx[p_2] - arrx[p_1]) < thresh && std::abs(arry[p_2]- arry[p_1]) < thresh) {
+                    flag = false;
+                    break;
+                }
+            }
+            if (flag) {
+                arrx[incr] = arrx[p_1];
+                arry[incr] = arry[p_1];
+                incr++;
+            }
+        }
+        arrc = incr;
+        NV3 = incr;
+
+        int cornersAdded = 0;
+        //add each corner if it is inside subject polygon
+        for (Real64 cx = minX, i5 = 0; i5 < 2; cx = maxX, i5++) {
+            for (Real64 cy = minY, k5 = 0; k5 < 2; cy = maxY, k5++) {
+                int i;
+                int j;
+                bool insideFlag = false;
+                for (i = 0, j = NV1-1; i < NV1; j = i++) {
+                    if ((YTEMP1[i] > cy) != (YTEMP1[j] > cy) &&
+                        (cx < (XTEMP1[j] - XTEMP1[i]) * (cy - YTEMP1[i]) / (YTEMP1[j]-YTEMP1[i]) + XTEMP1[i])) {
+                        insideFlag = !insideFlag;
+                    }
+                }
+                if (insideFlag) {
+                    arrx[arrc] = cx;
+                    arry[arrc] = cy;
+                    arrc += 1;
+                    NV3 += 1;
+                    cornersAdded++;
+                }
+            }
+        }
+
+        //Sort vertices clockwise around center of final polygon, into TEMP
+        //Use insertion sort 
+        if (NV3 > 2) {
+            Real64 centerX = 0;
+            Real64 centerY = 0;
+            //use center of mass
+            for (int i = 0; i < NV3; i++) {
+                centerX += arrx[i];
+                centerY += arry[i];
+            }
+            centerX /= NV3;
+            centerY /= NV3;
+            for (int unsortedBegin = arrc-cornersAdded; unsortedBegin < arrc; unsortedBegin++) {
+                Real64 currX = arrx[unsortedBegin];
+                Real64 currY = arry[unsortedBegin];
+                int j3 = unsortedBegin - 1;
+                
+                Real64 dx1 = currX - centerX;
+                Real64 dy1 = currY - centerY;
+                Real64 dx2 = arrx[j3] - centerX; 
+                Real64 dy2 = arry[j3] - centerY;
+                while (j3 >= 0 && copysign(1. - dx1/(fabs(dx1)+fabs(dy1)),dy1) > copysign(1. - dx2/(fabs(dx2)+fabs(dy2)),dy2)) {
+                    arrx[j3 + 1] = arrx[j3]; 
+                    arry[j3 + 1] = arry[j3]; 
+                    j3 --; 
+                    dx2 = arrx[j3] - centerX; 
+                    dy2 = arry[j3] - centerY;
+                } 
+                
+                arrx[j3 + 1] = currX; 
+                arry[j3 + 1] = currY; 
+            }
+        }
+
+
+
+        for (int k = 0; k < NV3; k++) {
+            XTEMP[k] = arrx[k];
+            YTEMP[k] = arry[k];
+        }
+       
+        //update homogenous edges A,B,C (no effect on failing test case)
+        if (NV3 > 2) {
+            Real64 const X_1(XTEMP(1));
+            Real64 const Y_1(YTEMP(1));
+            
+            Real64 X_P(X_1), X_P1;
+            Real64 Y_P(Y_1), Y_P1;
+            for (int P = 1; P < NV3; ++P) {
+                X_P1 = XTEMP(P + 1);
+                Y_P1 = YTEMP(P + 1);
+
+                ATEMP(P) = Y_P - Y_P1;
+                BTEMP(P) = X_P1 - X_P;
+                CTEMP(P) = X_P * Y_P1 - Y_P * X_P1;
+                X_P = X_P1;
+                Y_P = Y_P1;
+            }
+            ATEMP(NV3) = Y_P1 - Y_1;
+            BTEMP(NV3) = X_1 - X_P1;
+            CTEMP(NV3) = X_P1 * Y_1 - Y_P1 * X_1;
+        }
+        
+        //Determine overlap status
+        if (NV3 < 3) {
+            OverlapStatus = NoOverlap;
+        } else {
+            int insideCount = 0;
+            for (int k_2 = 0; k_2 < NV3; k_2++) {
+                if ((XTEMP[k_2] <= maxX && XTEMP[k_2] >= minX) && (YTEMP[k_2] <= maxY && YTEMP[k_2] >= minY)) {
+                    insideCount ++; // inside
+                } 
+            }
+            if (insideCount > 1) { //More than one vertex is inside
+                OverlapStatus = PartialOverlap;
+            }
+            insideCount = 0;
+            for (int k_2 = 0; k_2 < NV1; k_2++) {
+                if ((XTEMP1[k_2] <= maxX && XTEMP1[k_2] >= minX) && (YTEMP1[k_2] <= maxY && YTEMP1[k_2] >= minY)) {
+                    insideCount ++;
+                }
+            }
+            if (insideCount == NV3) { //All in subject are inside
+                OverlapStatus = FirstSurfWithinSecond;
+            }
+        }
+    }
+
     void CLIPPOLY(int const NS1, // Figure number of figure 1 (The subject polygon)
                   int const NS2, // Figure number of figure 2 (The clipping polygon)
                   int const NV1, // Number of vertices of figure 1
@@ -3837,7 +4093,6 @@ namespace SolarShading {
                   int &NV3       // Number of vertices of figure 3
     )
     {
-
         // SUBROUTINE INFORMATION:
         //       AUTHOR         Tyler Hoyt
         //       DATE WRITTEN   May 4, 2010
@@ -3887,7 +4142,6 @@ namespace SolarShading {
         ++NumClipPoly_Calls;
 #endif
         // Tuned Linear indexing
-
         assert(equal_dimensions(HCX, HCY));
         assert(equal_dimensions(HCX, HCA));
         assert(equal_dimensions(HCX, HCB));
@@ -3905,10 +4159,35 @@ namespace SolarShading {
         NVOUT = NV1; // First point-loop is the length of the subject polygon.
         INTFLAG = false;
         NVTEMP = 0;
-        KK = 0;
+        
+        //Check if clipping polygon is rectangle
+        auto l1(HCA.index(NS2, 1));
+        bool rectFlag = false;
+        if (NV2 == 4) {
+            //check rectangle TODO
+            if (HCX[l1] == HCX[l1+1] && HCY[l1] != HCY[l1+1]) {
+                if (HCY[l1+2] == HCY[l1+1] && HCY[l1+3] == HCY[l1]) {
+                    if (HCX[l1+2] == HCX[l1+3]) {
+                        rectFlag = true;
+                    }
+                }
+            } else if (HCY[l1] == HCY[l1+1] && HCX[l1] != HCX[l1+1]) {
+                if (HCX[l1+2] == HCX[l1+1] && HCX[l1+3] == HCX[l1]) {
+                    if (HCY[l1+2] == HCY[l1+3]) {
+                        rectFlag = true;
+                    }
+                }
+            }
+        }
 
+
+        if (rectFlag) {
+            CLIPRECT(NS1, NS2, NV1, NV3);
+            return;
+        } 
+        
         auto l(HCA.index(NS2, 1));
-        for (int E = 1; E <= NV2; ++E, ++l) { // Loop over edges of the clipping polygon
+        for (int E = 1; E <= NV2; ++E, ++l) { // Loop over edges of the clipping polygon\n
             for (int P = 1; P <= NVOUT; ++P) {
                 XTEMP1(P) = XTEMP(P);
                 YTEMP1(P) = YTEMP(P);
@@ -3919,6 +4198,7 @@ namespace SolarShading {
             Real64 const HCC_E(HCC[l]);
             Real64 XTEMP1_S(XTEMP1(S));
             Real64 YTEMP1_S(YTEMP1(S));
+
             for (int P = 1; P <= NVOUT; ++P) {
                 Real64 const XTEMP1_P(XTEMP1(P));
                 Real64 const YTEMP1_P(YTEMP1(P));
@@ -3934,11 +4214,13 @@ namespace SolarShading {
                         Real64 const ATEMP_S(ATEMP(S));
                         Real64 const BTEMP_S(BTEMP(S));
                         Real64 const CTEMP_S(CTEMP(S));
+
                         W = HCB_E * ATEMP_S - HCA_E * BTEMP_S;
                         if (W != 0.0) {
                             Real64 const W_inv(1.0 / W);
                             XTEMP(NVTEMP) = nint64((HCC_E * BTEMP_S - HCB_E * CTEMP_S) * W_inv);
                             YTEMP(NVTEMP) = nint64((HCA_E * CTEMP_S - HCC_E * ATEMP_S) * W_inv);
+
                         } else {
                             XTEMP(NVTEMP) = SafeDivide(HCC_E * BTEMP_S - HCB_E * CTEMP_S, W);
                             YTEMP(NVTEMP) = SafeDivide(HCA_E * CTEMP_S - HCC_E * ATEMP_S, W);
@@ -3949,6 +4231,7 @@ namespace SolarShading {
                             if (KK != 0) {
                                 auto const x(XTEMP(NVTEMP));
                                 auto const y(YTEMP(NVTEMP));
+
                                 for (int K = 1; K <= KK; ++K) {
                                     if (std::abs(x - XTEMP(K)) > 2.0) continue;
                                     if (std::abs(y - YTEMP(K)) > 2.0) continue;
@@ -4037,11 +4320,13 @@ namespace SolarShading {
                 if (NVOUT > 2) { // Compute HC values for edges of output polygon
                     Real64 const X_1(XTEMP(1));
                     Real64 const Y_1(YTEMP(1));
+                    
                     Real64 X_P(X_1), X_P1;
                     Real64 Y_P(Y_1), Y_P1;
                     for (int P = 1; P < NVOUT; ++P) {
                         X_P1 = XTEMP(P + 1);
                         Y_P1 = YTEMP(P + 1);
+
                         ATEMP(P) = Y_P - Y_P1;
                         BTEMP(P) = X_P1 - X_P;
                         CTEMP(P) = X_P * Y_P1 - Y_P * X_P1;
@@ -4064,6 +4349,7 @@ namespace SolarShading {
             OverlapStatus = FirstSurfWithinSecond;
         }
     }
+
 
     void MULTOL(int const NNN,   // argument
                 int const LOC0,  // Location in the homogeneous coordinate array
