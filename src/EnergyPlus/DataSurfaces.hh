@@ -842,6 +842,66 @@ namespace DataSurfaces {
     struct SurfaceWindowCalc // Calculated window-related values
     {
         // Members
+
+         Real64 FrameQRadOutAbs;    // Radiation absorbed by outside of frame (solar) (W/m2)
+        Real64 FrameQRadInAbs;     // Radiation absorbed by inside of frame (short-wave from solar
+        Real64 DividerQRadOutAbs;          // Radiation absorbed by outside of divider (solar) (W/m2)
+        Real64 DividerQRadInAbs;     // Radiation absorbed by inside of divider (short-wave from solar
+        Real64 ExtBeamAbsByShade;        // Exterior beam solar absorbed by window shade (W/m2)
+        Real64 ExtDiffAbsByShade;        // Exterior diffuse solar absorbed by window shade (W/m2)
+        Real64 IntBeamAbsByShade;        // Interior beam solar absorbed by window shade (W/m2)
+        Real64 IntSWAbsByShade;          // Interior diffuse solar plus short-wave from lights absorbed by window shade (W/m2)
+        Real64 InitialDifSolAbsByShade;  // Initial diffuse solar from ext and int windows absorbed by window shade (W/m2)
+        Real64 IntLWAbsByShade;          // Interior long-wave from zone lights and equipment absorbed by window shade (W/m2)
+        Real64 ConvHeatFlowNatural;      // Convective heat flow from gap between glass and interior shade or blind (W)
+        Real64 ConvHeatGainToZoneAir;    // Convective heat gain to zone air from window gap airflow (W)
+        Real64 RetHeatGainToZoneAir;     // Convective heat gain to return air sent to zone [W]
+        Real64 DividerHeatGain;
+        Real64 BlTsolBmBm;                      // Time-step value of blind beam-beam solar transmittance (-)
+        Real64 BlTsolBmDif;                     // Time-step value of blind beam-diffuse solar transmittance (-)
+        Real64 BlTsolDifDif;                    // Time-step value of blind diffuse-diffuse solar transmittance (-)
+        Real64 BlGlSysTsolBmBm;                 // Time-step value of blind/glass system beam-beam solar transmittance (-)
+        Real64 BlGlSysTsolDifDif;               // Time-step value of blind/glass system diffuse-diffuse solar transmittance (-)
+        Real64 ScTsolBmBm;                      // Time-step value of screen beam-beam solar transmittance (-)
+        Real64 ScTsolBmDif;                     // Time-step value of screen beam-diffuse solar transmittance (-)
+        Real64 ScTsolDifDif;                    // Time-step value of screen diffuse-diffuse solar transmittance (-)
+        Real64 ScGlSysTsolBmBm;                 // Time-step value of screen/glass system beam-beam solar transmittance (-)
+        Real64 ScGlSysTsolDifDif;               // Time-step value of screen/glass system diffuse-diffuse solar transmittance (-)
+        Real64 GlTsolBmBm;                      // Time-step value of glass beam-beam solar transmittance (-)
+        Real64 GlTsolBmDif;                     // Time-step value of glass beam-diffuse solar transmittance (-)
+        Real64 GlTsolDifDif;                    // Time-step value of glass diffuse-diffuse solar transmittance (-)
+        Real64 BmSolTransThruIntWinRep;         // Beam solar transmitted through interior window [W]
+        Real64 BmSolAbsdOutsReveal;        // Multiplied by BeamSolarRad, gives beam solar absorbed by
+        Real64 BmSolRefldOutsRevealReport; // Beam solar reflected by outside reveal surfaces, for reporting (m2)
+        Real64 BmSolAbsdInsReveal;  // Multiplied by BeamSolarRad, gives beam solar absorbed
+        Real64 BmSolRefldInsReveal; // Multiplied by BeamSolarRad, gives beam solar reflected
+        Real64 BmSolRefldInsRevealReport;  // Beam solar reflected by inside reveal surfaces, for reporting (W)
+        Real64 OutsRevealDiffOntoGlazing; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from
+        Real64 InsRevealDiffOntoGlazing; // Multiplied by BeamSolarRad, gives diffuse from beam reflection
+        //  from inside reveal that is incident on the glazing per m2 of glazing (-)
+        Real64 InsRevealDiffIntoZone; // Multiplied by BeamSolarRad, gives diffuse from beam reflection
+        //  from inside reveal that goes into zone directly or reflected from glazing (m2)
+        Real64 OutsRevealDiffOntoFrame; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from outside reveal
+        //   that is incident on the outside of the frame per m2 of frame (-)
+        Real64 InsRevealDiffOntoFrame; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from inside reveal
+        //   that is incident on the outside of the frame per m2 of frame (-)
+        // added for debugging CR 7596. TH 5/26/2009
+        Real64 InsRevealDiffOntoGlazingReport; // Diffuse solar from beam reflection
+        //  from inside reveal that is incident on the glazing (W)
+        Real64 InsRevealDiffIntoZoneReport; // Diffuse from beam reflection
+        //  from inside reveal that goes into zone directly or reflected from glazing (W)
+        Real64 InsRevealDiffOntoFrameReport; // Diffuse from beam reflection from inside reveal
+        //  that is incident on the frame (W)
+        Real64 BmSolAbsdInsRevealReport;  
+        Real64 BmSolTransThruIntWinRepEnergy; // energy of BmSolTransThruIntWinRep [J]
+        Real64 BmSolRefldOutsRevealRepEnergy; // energy of BmSolRefldOutsRevealReport [J]
+        Real64 BmSolRefldInsRevealRepEnergy;  // energy of BmSolRefldInsRevealReport [J]
+        Real64 ProfileAngHor;       // Horizontal beam solar profile angle (degrees)
+        Real64 ProfileAngVert;      // Vertical beam solar profile angle (degrees)
+        Real64 SkySolarInc;                     // Incident diffuse solar from sky; if CalcSolRefl is true, includes
+        // reflection of sky diffuse and beam solar from exterior obstructions [W/m2]
+        Real64 GndSolarInc; // Incident diffuse solar from ground; if CalcSolRefl is true, accounts
+       
         int ShadingFlag; // -1: window has no shading device
         //   0: shading device is off
         //   1: interior shade is on
@@ -923,9 +983,10 @@ namespace DataSurfaces {
         Real64 FrameTempSurfIn;    // Frame inside surface temperature (C)
         Real64 FrameTempSurfInOld; // Previous value of frame inside surface temperature (C)
         Real64 FrameTempSurfOut;   // Frame outside surface temperature (C)
-        Real64 FrameQRadInAbs;     // Radiation absorbed by inside of frame (short-wave from solar
         //   and lights; long-wave from internal gains) (W/m2)
-        Real64 FrameQRadOutAbs;    // Radiation absorbed by outside of frame (solar) (W/m2)
+        
+        
+
         Real64 ProjCorrFrOut;      // Correction factor to absorbed radiation due to frame outside projection
         Real64 ProjCorrFrIn;       // Correction factor to absorbed radiation due to frame inside projection
         int DividerType;           // Divider type (1=DividedLite, 2=Suspended (between-pane))
@@ -946,9 +1007,7 @@ namespace DataSurfaces {
         Real64 DividerTempSurfIn;    // Divider inside surface temperature (C)
         Real64 DividerTempSurfInOld; // Previous value of divider inside surface temperature (C)
         Real64 DividerTempSurfOut;   // Divider outside surface temperature (C)
-        Real64 DividerQRadInAbs;     // Radiation absorbed by inside of divider (short-wave from solar
         //   and lights; long-wave from internal gains) (W/m2)
-        Real64 DividerQRadOutAbs;          // Radiation absorbed by outside of divider (solar) (W/m2)
         Real64 ProjCorrDivOut;             // Correction factor to absorbed radiation due to divider outside projection
         Real64 ProjCorrDivIn;              // Correction factor to absorbed radiation due to divider inside projection
         Real64 GlazedFrac;                 // (Glazed area)/(Glazed area + divider area)
@@ -964,20 +1023,11 @@ namespace DataSurfaces {
         // Glass Door - SurfaceClass_GlassDoor
         // tubular daylighting device dome - SurfaceClass_TDD_Dome
         // tubular daylighting device diffuser - SurfaceClass_TDD_Diffuser
-        Real64 ExtBeamAbsByShade;        // Exterior beam solar absorbed by window shade (W/m2)
-        Real64 ExtDiffAbsByShade;        // Exterior diffuse solar absorbed by window shade (W/m2)
-        Real64 IntBeamAbsByShade;        // Interior beam solar absorbed by window shade (W/m2)
-        Real64 IntSWAbsByShade;          // Interior diffuse solar plus short-wave from lights absorbed by window shade (W/m2)
-        Real64 InitialDifSolAbsByShade;  // Initial diffuse solar from ext and int windows absorbed by window shade (W/m2)
-        Real64 IntLWAbsByShade;          // Interior long-wave from zone lights and equipment absorbed by window shade (W/m2)
         Array1D<Real64> ShadeAbsFacFace; // Fraction of short-wave radiation incident on face 1 that is
         //  absorbed by face 1 and by the other face (face 2) when total absorbed
         //  radiation is apportioned to the two faces
         Real64 ConvCoeffWithShade; // Convection coefficient from glass or shade to gap air when
         //  interior or exterior shade is present (W/m2-K)
-        Real64 ConvHeatFlowNatural;      // Convective heat flow from gap between glass and interior shade or blind (W)
-        Real64 ConvHeatGainToZoneAir;    // Convective heat gain to zone air from window gap airflow (W)
-        Real64 RetHeatGainToZoneAir;     // Convective heat gain to return air sent to zone [W]
         Real64 OtherConvHeatGain;        // other convective = total conv - standard model prediction for EQL window model (W)
         int BlindNumber;                 // Blind number for a window with a blind
         Array1D<Real64> EffShBlindEmiss; // Effective emissivity of interior blind or shade
@@ -993,8 +1043,6 @@ namespace DataSurfaces {
         Real64 BlindAirFlowPermeability; // Blind air-flow permeability for calculation of convective flow
         //  in gap between blind and glass
         Real64 TotGlazingThickness; // Total glazing thickness from outside of outer glass to inside of inner glass (m)
-        Real64 ProfileAngHor;       // Horizontal beam solar profile angle (degrees)
-        Real64 ProfileAngVert;      // Vertical beam solar profile angle (degrees)
         Real64 TanProfileAngHor;    // Tangent of horizontal profile angle
         Real64 TanProfileAngVert;   // Tangent of vertical profile angle
         Real64 InsideSillDepth;     // Depth of inside sill (m)
@@ -1002,46 +1050,12 @@ namespace DataSurfaces {
         Real64 InsideSillSolAbs;    // Solar absorptance of inside sill
         Real64 InsideRevealSolAbs;  // Solar absorptance of inside reveal
         Real64 OutsideRevealSolAbs; // Solar absorptance of outside reveal
-        Real64 BmSolAbsdInsReveal;  // Multiplied by BeamSolarRad, gives beam solar absorbed
         // by inside reveal surfaces (m2)
-        Real64 BmSolRefldInsReveal; // Multiplied by BeamSolarRad, gives beam solar reflected
         // by inside reveal surfaces (m2)
-        Real64 BmSolRefldInsRevealReport;  // Beam solar reflected by inside reveal surfaces, for reporting (W)
-        Real64 BmSolRefldOutsRevealReport; // Beam solar reflected by outside reveal surfaces, for reporting (m2)
-        Real64 BmSolAbsdOutsReveal;        // Multiplied by BeamSolarRad, gives beam solar absorbed by
         // outside reveal surfaces (m2)
-        Real64 OutsRevealDiffOntoGlazing; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from
         //    outside reveal that is incident on the glazing per m2 of glazing (-)
-        Real64 InsRevealDiffOntoGlazing; // Multiplied by BeamSolarRad, gives diffuse from beam reflection
-        //  from inside reveal that is incident on the glazing per m2 of glazing (-)
-        Real64 InsRevealDiffIntoZone; // Multiplied by BeamSolarRad, gives diffuse from beam reflection
-        //  from inside reveal that goes into zone directly or reflected from glazing (m2)
-        Real64 OutsRevealDiffOntoFrame; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from outside reveal
-        //   that is incident on the outside of the frame per m2 of frame (-)
-        Real64 InsRevealDiffOntoFrame; // Multiplied by BeamSolarRad, gives diffuse from beam reflection from inside reveal
-        //   that is incident on the outside of the frame per m2 of frame (-)
-        // added for debugging CR 7596. TH 5/26/2009
-        Real64 InsRevealDiffOntoGlazingReport; // Diffuse solar from beam reflection
-        //  from inside reveal that is incident on the glazing (W)
-        Real64 InsRevealDiffIntoZoneReport; // Diffuse from beam reflection
-        //  from inside reveal that goes into zone directly or reflected from glazing (W)
-        Real64 InsRevealDiffOntoFrameReport; // Diffuse from beam reflection from inside reveal
-        //  that is incident on the frame (W)
-        Real64 BmSolAbsdInsRevealReport;        // Beam solar absorbed by inside reveal (W)
-        Real64 BlTsolBmBm;                      // Time-step value of blind beam-beam solar transmittance (-)
-        Real64 BlTsolBmDif;                     // Time-step value of blind beam-diffuse solar transmittance (-)
-        Real64 BlTsolDifDif;                    // Time-step value of blind diffuse-diffuse solar transmittance (-)
-        Real64 BlGlSysTsolBmBm;                 // Time-step value of blind/glass system beam-beam solar transmittance (-)
-        Real64 BlGlSysTsolDifDif;               // Time-step value of blind/glass system diffuse-diffuse solar transmittance (-)
+              // Beam solar absorbed by inside reveal (W)
         int ScreenNumber;                       // Screen number for a window with a screen (do not confuse with material number)
-        Real64 ScTsolBmBm;                      // Time-step value of screen beam-beam solar transmittance (-)
-        Real64 ScTsolBmDif;                     // Time-step value of screen beam-diffuse solar transmittance (-)
-        Real64 ScTsolDifDif;                    // Time-step value of screen diffuse-diffuse solar transmittance (-)
-        Real64 ScGlSysTsolBmBm;                 // Time-step value of screen/glass system beam-beam solar transmittance (-)
-        Real64 ScGlSysTsolDifDif;               // Time-step value of screen/glass system diffuse-diffuse solar transmittance (-)
-        Real64 GlTsolBmBm;                      // Time-step value of glass beam-beam solar transmittance (-)
-        Real64 GlTsolBmDif;                     // Time-step value of glass beam-diffuse solar transmittance (-)
-        Real64 GlTsolDifDif;                    // Time-step value of glass diffuse-diffuse solar transmittance (-)
         int AirflowSource;                      // Source of gap airflow (INSIDEAIR, OUTSIDEAIR, etc.)
         int AirflowDestination;                 // Destination of gap airflow (INSIDEAIR, OUTSIDEAIR, etc.)
         int AirflowReturnNodePtr;               // Return node pointer for destination = ReturnAir
@@ -1052,7 +1066,6 @@ namespace DataSurfaces {
         Real64 AirflowThisTS;                   // Gap airflow this timestep (m3/s per m of glazing width)
         Real64 TAirflowGapOutlet;               // Temperature of air leaving airflow gap between glass panes (C)
         int WindowCalcIterationsRep;            // Number of iterations in window heat balance calculation
-        Real64 BmSolTransThruIntWinRep;         // Beam solar transmitted through interior window [W]
         Real64 VentingOpenFactorRep;            // Window/door venting open factor, for reporting
         Real64 VentingOpenFactorMultRep;        // Window/door opening modulation multiplier on venting open factor, for reporting
         Real64 InsideTempForVentingRep;         // Inside air temp used to control window/door venting, for reporting (C)
@@ -1060,9 +1073,6 @@ namespace DataSurfaces {
         Array1D<Real64> IllumFromWinAtRefPtRep; // Illuminance from window at reference point #1 [lux]
         Array1D<Real64> LumWinFromRefPtRep;     // Window luminance as viewed from reference point #1 [cd/m2]
         Real64 LumWinFromRefPt2Rep;             // Window luminance as viewed from reference point #2 [cd/m2]
-        Real64 SkySolarInc;                     // Incident diffuse solar from sky; if CalcSolRefl is true, includes
-        // reflection of sky diffuse and beam solar from exterior obstructions [W/m2]
-        Real64 GndSolarInc; // Incident diffuse solar from ground; if CalcSolRefl is true, accounts
         // for shadowing of ground by building and obstructions [W/m2]
         Real64 SkyGndSolarInc; // Incident diffuse solar from ground-reflected sky radiation; used for
         // Complex Fen; if CalcSolRefl is true, accounts for shadowing of ground by building and obstructions [W/m2]
@@ -1078,12 +1088,8 @@ namespace DataSurfaces {
         bool SolarDiffusing; // True if exterior window with a construction that contains a
         //  diffusing glass layer
         // energy
-        Real64 BmSolRefldInsRevealRepEnergy;  // energy of BmSolRefldInsRevealReport [J]
-        Real64 BmSolRefldOutsRevealRepEnergy; // energy of BmSolRefldOutsRevealReport [J]
-        Real64 BmSolTransThruIntWinRepEnergy; // energy of BmSolTransThruIntWinRep [J]
         // Reporting
         Real64 FrameHeatGain;
-        Real64 DividerHeatGain;
         Real64 FrameHeatLoss;
         Real64 DividerHeatLoss;
         // Added TH for thermochromic windows. 12/22/2008
