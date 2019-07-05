@@ -50,6 +50,7 @@
 #include <cassert>
 #include <cmath>
 #include <limits>
+#include <chrono>
 #include <string>
 
 // ObjexxFCL Headers
@@ -289,10 +290,10 @@ namespace ConvectionCoefficients {
         using DataLoopNode::NumOfNodes;
         using DataZoneEquipment::ZoneEquipInputsFilled;
         using DataZoneEquipment::ZoneEquipSimulatedOnce;
-
+        
+         
         // SUBROUTINE LOCAL VARIABLE DECLARATIONS:
         int ZoneNum;                          // DO loop counter for zones
-        int SurfNum;                          // DO loop counter for surfaces in zone
         static bool NodeCheck(true);          // for CeilingDiffuser Zones
         static bool ActiveSurfaceCheck(true); // for radiant surfaces in zone
         static bool MyEnvirnFlag(true);
@@ -368,6 +369,7 @@ namespace ConvectionCoefficients {
             MyEnvirnFlag = false;
         }
         if (!BeginEnvrnFlag) MyEnvirnFlag = true;
+        
         for (ZoneNum = 1; ZoneNum <= NumOfZones; ++ZoneNum) {
 
             {
@@ -384,9 +386,11 @@ namespace ConvectionCoefficients {
                 }
             }
         }
-        for (ZoneNum = 1; ZoneNum <= NumOfZones; ++ZoneNum) {
 
-            for (SurfNum = Zone(ZoneNum).SurfaceFirst; SurfNum <= Zone(ZoneNum).SurfaceLast; ++SurfNum) {
+        //90% this loop
+        for (int ZoneNum = 1; ZoneNum <= NumOfZones; ++ZoneNum) {
+
+            for (int SurfNum = Zone(ZoneNum).SurfaceFirst; SurfNum <= Zone(ZoneNum).SurfaceLast; ++SurfNum) {
 
                 if (!Surface(SurfNum).HeatTransSurf) continue; // Skip non-heat transfer surfaces
 
@@ -418,12 +422,37 @@ namespace ConvectionCoefficients {
                         if (HConvIn(SurfNum) < LowHConvLimit) HConvIn(SurfNum) = LowHConvLimit;
 
                     } else if (SELECT_CASE_var1 == ASHRAETARP) {
+                        
                         if (!Construct(Surface(SurfNum).Construction).TypeIsWindow) {
-                            CalcASHRAEDetailedIntConvCoeff(SurfNum, SurfaceTemperatures(SurfNum), MAT(ZoneNum));
+                            if (Surface(SurfNum).ExtBoundCond == DataSurfaces::KivaFoundation)
+                            {
+                                SurfaceGeometry::kivaManager.surfaceConvMap[SurfNum].in = [](double Tsurf, double Tamb, double, double, double cosTilt) -> double {
+                                    return CalcASHRAETARPNatural(Tsurf, Tamb, cosTilt);
+                                };
+                            } else {
+                                Real64 DeltaTemp = SurfaceTemperatures(SurfNum) - MAT(ZoneNum);
+                                Real64 cosTilt = -Surface(SurfNum).CosTilt;
+                                Real64 prod = DeltaTemp * cosTilt;
+                                // Set HConvIn using the proper correlation based on DeltaTemp and Surface (Cosine Tilt)
+                                
+                                if (prod == 0) { // Vertical Surface
+
+                                    HConvIn(SurfNum) = 1.31 * std::cbrt(std::abs(DeltaTemp));
+
+                                } else if (prod > 0) { // Enhanced Convection
+
+                                    HConvIn(SurfNum) = 9.482 * std::cbrt(std::abs(DeltaTemp)) / (7.238 - std::abs(cosTilt));
+
+                                } else  { // Reduced Convection
+
+                                    HConvIn(SurfNum) = 1.810 * std::cbrt(std::abs(DeltaTemp)) / (1.382 + std::abs(cosTilt));
+
+                                } // ...end of IF-THEN block to set HConvIn
+                                
+                            }
                         } else {
                             CalcISO15099WindowIntConvCoeff(SurfNum, SurfaceTemperatures(SurfNum), MAT(ZoneNum));
                         }
-
                         // Establish some lower limit to avoid a zero convection coefficient (and potential divide by zero problems)
                         if (HConvIn(SurfNum) < LowHConvLimit) HConvIn(SurfNum) = LowHConvLimit;
 
@@ -438,6 +467,7 @@ namespace ConvectionCoefficients {
 
                         ShowFatalError("Unhandled convection coefficient algorithm.");
                     }
+
                 } else { // Interior convection has been set by the user with "value" or "schedule"
                     HConvIn(SurfNum) = SetIntConvectionCoeff(SurfNum);
                     // Establish some lower limit to avoid a zero convection coefficient (and potential divide by zero problems)
