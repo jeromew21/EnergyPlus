@@ -4749,7 +4749,7 @@ namespace ConvectionCoefficients {
         // case a)
         if ((0.0 <= TiltDeg) && (TiltDeg < 15.0)) {
 
-            Nuint = 0.13 * std::pow(RaH, OneThird);
+            Nuint = 0.13 * std::cbrt(RaH);
 
             // case b)
         } else if ((15.0 <= TiltDeg) && (TiltDeg <= 90.0)) {
@@ -4759,7 +4759,7 @@ namespace ConvectionCoefficients {
             if (RaH <= RaCV) {
                 Nuint = 0.56 * root_4(RaH * sineTilt); // eq. 135 in ISO 15099
             } else {
-                Nuint = 0.13 * (std::pow(RaH, OneThird) - std::pow(RaCV, OneThird)) + 0.56 * root_4(RaCV * sineTilt); // eq. 136 in ISO 15099
+                Nuint = 0.13 * (std::cbrt(RaH) - std::cbrt(RaCV)) + 0.56 * root_4(RaCV * sineTilt); // eq. 136 in ISO 15099
             }
 
             // case c)
@@ -5059,7 +5059,7 @@ namespace ConvectionCoefficients {
             }
         } // loop over zones for inside face parameters
 
-        CubeRootOfOverallBuildingVolume = std::pow(BldgVolumeSum, OneThird);
+        CubeRootOfOverallBuildingVolume = std::cbrt(BldgVolumeSum);
 
         // first pass over surfaces for outside face params
         for (SurfLoop = 1; SurfLoop <= TotSurfaces; ++SurfLoop) {
@@ -6875,7 +6875,7 @@ namespace ConvectionCoefficients {
             // Reynolds number = Vdot supply / v * cube root of zone volume (Goldstein and Noveselac 2010)
             if (Node(ZoneNode).MassFlowRate > 0.0) {
                 AirDensity = PsyRhoAirFnPbTdbW(OutBaroPress, Node(ZoneNode).Temp, PsyWFnTdpPb(Node(ZoneNode).Temp, OutBaroPress));
-                Re = Node(ZoneNode).MassFlowRate / (v * AirDensity * std::pow(Zone(ZoneNum).Volume, OneThird));
+                Re = Node(ZoneNode).MassFlowRate / (v * AirDensity * std::cbrt(Zone(ZoneNum).Volume));
             } else {
                 Re = 0.0;
             }
@@ -7915,7 +7915,7 @@ namespace ConvectionCoefficients {
 
         // FUNCTION LOCAL VARIABLE DECLARATIONS:
         // na
-        Hn = 1.31 * std::pow(std::abs(DeltaTemp), OneThird);
+        Hn = 1.31 * std::cbrt(std::abs(DeltaTemp));
 
         return Hn;
     }
@@ -7960,7 +7960,7 @@ namespace ConvectionCoefficients {
 
         // FUNCTION LOCAL VARIABLE DECLARATIONS:
         // na
-        Hn = 9.482 * std::pow(std::abs(DeltaTemp), OneThird) / (7.238 - std::abs(CosineTilt));
+        Hn = 9.482 * std::cbrt(std::abs(DeltaTemp)) / (7.238 - std::abs(CosineTilt));
 
         return Hn;
     }
@@ -8005,7 +8005,7 @@ namespace ConvectionCoefficients {
 
         // FUNCTION LOCAL VARIABLE DECLARATIONS:
         // na
-        Hn = 1.810 * std::pow(std::abs(DeltaTemp), OneThird) / (1.382 + std::abs(CosineTilt));
+        Hn = 1.810 * std::cbrt(std::abs(DeltaTemp)) / (1.382 + std::abs(CosineTilt));
 
         return Hn;
     }
@@ -8657,7 +8657,7 @@ namespace ConvectionCoefficients {
             pow_3(((SurfTemp - SupplyAirTemp) / std::abs(DeltaTemp)) *
                   (-0.199 + 0.190 * std::pow(AirChangeRate,
                                              0.8))); // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
-        Real64 Hc = std::pow(std::abs(cofpow), OneThird);   // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
+        Real64 Hc = std::cbrt(std::abs(cofpow));   // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
         if (cofpow < 0.0) {
             Hc = -Hc;
         }
@@ -8737,7 +8737,7 @@ namespace ConvectionCoefficients {
                             0.190 * std::pow(AirChangeRate,
                                              0.8))); // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
             HcTmp1 =
-                    std::pow(std::abs(cofpow), OneThird); // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
+                    std::cbrt(std::abs(cofpow)); // Tuned pow_6( std::pow( std::abs( DeltaTemp ), OneThird ) ) changed to pow_2( DeltaTemp )
             if (cofpow < 0.0) {
                 HcTmp1 = -HcTmp1;
             }
@@ -8824,7 +8824,7 @@ namespace ConvectionCoefficients {
 
         Real64 cofpow = pow_3(0.6 * std::pow(std::abs(DeltaTemp) / HydraulicDiameter, OneFifth)) +
                      pow_3(((SurfTemp - SupplyAirTemp) / std::abs(DeltaTemp)) * (0.159 + 0.116 * std::pow(AirChangeRate, 0.8)));
-        Real64 Hc = std::pow(std::abs(cofpow), OneThird);
+        Real64 Hc = std::cbrt(std::abs(cofpow));
         if (cofpow < 0.0) {
             Hc = -Hc;
         }
@@ -8894,9 +8894,9 @@ namespace ConvectionCoefficients {
         //  PhD. Thesis. University of Strathclyde, Glasgow, UK.
 
         Real64 cofpow = std::sqrt(pow_6(1.4 * std::pow(std::abs(DeltaTemp) / HydraulicDiameter, OneFourth)) +
-                           pow_6(1.63 * std::pow(std::abs(DeltaTemp), OneThird))) +
+                           pow_6(1.63 * std::cbrt(std::abs(DeltaTemp)))) +
                  pow_3(((SurfTemp - SupplyAirTemp) / std::abs(DeltaTemp)) * (0.159 + 0.116 * std::pow(AirChangeRate, 0.8)));
-        Real64 Hc = std::pow(std::abs(cofpow), OneThird);
+        Real64 Hc = std::cbrt(std::abs(cofpow));
         if (cofpow < 0.0) {
             Hc = -Hc;
         }
@@ -8966,7 +8966,7 @@ namespace ConvectionCoefficients {
 
         Real64 cofpow = pow_3(0.6 * std::pow(std::abs(DeltaTemp) / HydraulicDiameter, OneFifth)) +
                  pow_3(((SurfTemp - SupplyAirTemp) / std::abs(DeltaTemp)) * (-0.166 + 0.484 * std::pow(AirChangeRate, 0.8)));
-        Real64 Hc = std::pow(std::abs(cofpow), OneThird);
+        Real64 Hc = std::cbrt(std::abs(cofpow));
         if (cofpow < 0.0) {
             Hc = -Hc;
         }
@@ -9035,9 +9035,9 @@ namespace ConvectionCoefficients {
         //  PhD. Thesis. University of Strathclyde, Glasgow, UK.
 
         Real64 cofpow = std::sqrt(pow_6(1.4 * std::pow(std::abs(DeltaTemp) / HydraulicDiameter, OneFourth)) +
-                               pow_6(1.63 * std::pow(std::abs(DeltaTemp), OneThird))) +
+                               pow_6(1.63 * std::cbrt(std::abs(DeltaTemp)))) +
                      pow_3(((SurfTemp - SupplyAirTemp) / std::abs(DeltaTemp)) * (-0.166 + 0.484 * std::pow(AirChangeRate, 0.8)));
-        Real64 Hc = std::pow(std::abs(cofpow), OneThird);
+        Real64 Hc = std::cbrt(std::abs(cofpow));
         if (cofpow < 0.0) {
             Hc = -Hc;
         }
@@ -10046,7 +10046,7 @@ namespace ConvectionCoefficients {
             eta = 1.0; // forced convection gone because no wind
         }
 
-        return eta * (k / Ln) * 0.15 * std::pow(RaLn, OneThird) + (k / x) * Rf * 0.0296 * std::pow(Rex, FourFifths) * std::pow(Pr, OneThird);
+        return eta * (k / Ln) * 0.15 * std::cbrt(RaLn) + (k / x) * Rf * 0.0296 * std::pow(Rex, FourFifths) * std::cbrt(Pr);
     }
 
     Real64 CalcClearRoof(int const SurfNum,
