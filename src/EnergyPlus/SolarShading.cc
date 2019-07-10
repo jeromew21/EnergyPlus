@@ -4010,7 +4010,7 @@ namespace SolarShading {
             }
             centerX /= NV3;
             centerY /= NV3;
-            for (int unsortedBegin = arrc-cornersAdded; unsortedBegin < arrc; unsortedBegin++) {
+            for (int unsortedBegin = 0; unsortedBegin < arrc; unsortedBegin++) {
                 Real64 currX = arrx[unsortedBegin];
                 Real64 currY = arry[unsortedBegin];
                 int j3 = unsortedBegin - 1;
@@ -4183,6 +4183,42 @@ namespace SolarShading {
 
         if (rectFlag) {
             CLIPRECT(NS1, NS2, NV1, NV3);
+            /*
+            if (NV3 > 2) {
+                //PRINT SUBJECT
+                std::cout << "\n\nSubject " << NV1 << ": ";
+                for (int k = HCX.index(NS1, 1), m = 0; m < NV1; m++, k++) {
+                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
+                    if (m < NV1-1) {
+                        std::cout << ", ";
+                    }
+                }
+
+                //PRINT CLIPPING
+                std::cout << "\nClipping " << NV2 << ": ";
+                for (int k = HCX.index(NS2, 1), m = 0; m < NV2; m++, k++) {
+                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
+                    if (m < NS2-1) {
+                        std::cout << ", ";
+                    }
+                }
+                //PRINT CLIPRECT OUTPUT
+                std::cout << "\nRect Output " << NV3 << ": ";
+                for (int k = 0; k < NV3; k++) {
+                    std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
+                    if (k < NV3-1) {
+                        std::cout << ", ";
+                    }
+                }
+                //CLEAR XTEMP/YTEMP
+                for (int k = 0; k < NV3; k++) {
+                    XTEMP[k] = -9;
+                    YTEMP[k] = -9;
+                }
+            } else {
+                rectFlag = false;
+            }
+            */
             return;
         } 
         
@@ -4348,6 +4384,18 @@ namespace SolarShading {
         } else if (!INTFLAG) {
             OverlapStatus = FirstSurfWithinSecond;
         }
+        if (rectFlag) {
+            //PRINT SH OUTPUT
+            /* 
+            std::cout << "\nRef Output " << NV3 << ": ";
+            for (int k = 0; k < NV3; k++) {
+                std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
+                if (k < NV3-1) {
+                    std::cout << ", ";
+                }
+            }*/
+            //return;
+        } 
     }
 
 
