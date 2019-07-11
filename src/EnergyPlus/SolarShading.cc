@@ -3837,10 +3837,11 @@ namespace SolarShading {
 
     void CLIPRECT(int const NS1, int const NS2, int const NV1, int &NV3) {
         typedef Array2D<Int64>::size_type size_type;
+        return;
 
-auto start = std::chrono::high_resolution_clock::now();
-auto stop = std::chrono::high_resolution_clock::now(); 
-auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+//auto start = std::chrono::high_resolution_clock::now();
+//auto stop = std::chrono::high_resolution_clock::now(); 
+//auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
 
         auto l(HCA.index(NS2, 1));
         Real64 maxX = HCX[l];
@@ -3872,8 +3873,8 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
         
 
 
-        static double duration_count_loop;
-        start = std::chrono::high_resolution_clock::now();
+        //static double duration_count_loop;
+        //start = std::chrono::high_resolution_clock::now();
         //loop over lines in subject polygon (XTEMP). Most of runtime here!
         for (size_type j = 0, e = NV1; j < e; ++j) {
             //grab line endpoints
@@ -3957,17 +3958,22 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
                 arrc += 1;
             }
         } 
-        stop = std::chrono::high_resolution_clock::now(); 
-        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count_loop += duration.count();
-        std::cout << "duration_count_loop = " << duration_count_loop << "\n";
+        //stop = std::chrono::high_resolution_clock::now(); 
+        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        //duration_count_loop += duration.count();
+        //std::cout << "duration_count_loop = " << duration_count_loop << "\n";
 
         NV3 = arrc;
+        for (int k = 0; k < arrc; k++) {
+            XTEMP[k] = arrx[k];
+            YTEMP[k] = arry[k];
+        }
+        return;
 
         int cornersAdded = 0;
         //add each corner if it is inside subject polygon
         static double duration_count_corn;
-        start = std::chrono::high_resolution_clock::now();
+        //start = std::chrono::high_resolution_clock::now();
         for (int k = 0; k < 4; k++) {
             Real64 cx;
             Real64 cy;
@@ -4001,13 +4007,13 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
                 cornersAdded++;
             }
         }
-        stop = std::chrono::high_resolution_clock::now(); 
-        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count_corn += duration.count();
-        std::cout << "duration_count_corn = " << duration_count_corn << "\n";
+        //stop = std::chrono::high_resolution_clock::now(); 
+        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        //duration_count_corn += duration.count();
+        //std::cout << "duration_count_corn = " << duration_count_corn << "\n";
 
         static double duration_count_sort;
-        start = std::chrono::high_resolution_clock::now();
+        //start = std::chrono::high_resolution_clock::now();
         //Sort vertices clockwise around center of final polygon, into TEMP
         //Use insertion sort
         if (arrc > 2) {
@@ -4039,16 +4045,16 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
                 arry[j3 + 1] = currY;
             }
         }
-        stop = std::chrono::high_resolution_clock::now(); 
-        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count_sort += duration.count();
+        //stop = std::chrono::high_resolution_clock::now(); 
+        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        ////duration_count_sort += duration.count();
         std::cout << "duration_count_sort = " << duration_count_sort << "\n";
 
         //make uniq list of points -- potential source of error here, when slight error causes points
         // that are supposed to be the same are both kept
         // if done after sort: then can be done in linear runtime: todo
-        static double duration_count_uniq;
-        start = std::chrono::high_resolution_clock::now(); 
+        //static double duration_count_uniq;
+        //start = std::chrono::high_resolution_clock::now(); 
         Real64 thresh = 10;
         int incr = 0;
         Real64 lastX;
@@ -4079,10 +4085,10 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
                 incr++;
             } */
         }
-        stop = std::chrono::high_resolution_clock::now(); 
-        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count_uniq += duration.count();
-        std::cout << "duration_count_uniq = " << duration_count_uniq << "\n";
+        //stop = std::chrono::high_resolution_clock::now(); 
+        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        //duration_count_uniq += duration.count();
+        //std::cout << "duration_count_uniq = " << duration_count_uniq << "\n";
 
         arrc = incr;
         NV3 = incr;
@@ -4218,6 +4224,10 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
         int NVOUT;    // Current output length for loops
         int NVTEMP;
 
+        static double duration_count;
+
+auto start = std::chrono::high_resolution_clock::now();
+
         Real64 W; // Normalization factor
         Real64 HFunct;
 
@@ -4275,6 +4285,10 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
 
         if (rectFlag) {
             CLIPRECT(NS1, NS2, NV1, NV3);
+            auto stop = std::chrono::high_resolution_clock::now(); 
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+            duration_count += duration.count();
+            std::cout << duration_count << "\n";
             return;
             /* 
             if (NV3 > 2) {
@@ -4504,6 +4518,10 @@ auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - star
             }
 
         } */
+        auto stop = std::chrono::high_resolution_clock::now(); 
+auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+duration_count += duration.count();
+std::cout << duration_count << "\n";
     }
 
 
