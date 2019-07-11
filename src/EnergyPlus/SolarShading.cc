@@ -3838,6 +3838,10 @@ namespace SolarShading {
     void CLIPRECT(int const NS1, int const NS2, int const NV1, int &NV3) {
         typedef Array2D<Int64>::size_type size_type;
 
+auto start = std::chrono::high_resolution_clock::now();
+auto stop = std::chrono::high_resolution_clock::now(); 
+auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+
         auto l(HCA.index(NS2, 1));
         Real64 maxX = HCX[l];
         Real64 minX = HCX[l];
@@ -3858,54 +3862,20 @@ namespace SolarShading {
             }
         }
 
-
         for (int P = 1; P <= NV1; ++P) {
-            XTEMP1(P) = XTEMP(P);
+            XTEMP1(P) = XTEMP(P); //Copy subject polygon
             YTEMP1(P) = YTEMP(P);
         }
-        Real64 arrx[40];
-        Real64 arry[40];
-        int arrc = 0;
-        int cornersAdded = 0;
+        Real64 arrx[40]; //Temp array for output X
+        Real64 arry[40]; //Temp array for output Y
+        int arrc = 0; //Number of items in output
+        
 
 
-        //add each corner if it is inside subject polygon
-        for (int k = 0; k < 4; k++) {
-            Real64 cx;
-            Real64 cy;
-            if (k == 0) {
-                cx = minX;
-                cy = minY;
-            } else if (k == 1) {
-                cx = minX;
-                cy = maxY;
-            } else if (k == 2) {
-                cx = maxX;
-                cy = maxY;
-            } else if (k == 3) {
-                cx = maxX;
-                cy = minY;
-            }
-            int i;
-            int j;
-            bool insideFlag = false;
-            for (i = 0, j = NV1-1; i < NV1; j = i++) {
-                if ((YTEMP1[i] > cy) != (YTEMP1[j] > cy) &&
-                    (cx < (XTEMP1[j] - XTEMP1[i]) * (cy - YTEMP1[i]) / (YTEMP1[j]-YTEMP1[i]) + XTEMP1[i])) {
-                    insideFlag = !insideFlag;
-                }
-            }
-            if (insideFlag) {
-                arrx[arrc] = cx;
-                arry[arrc] = cy;
-                arrc += 1;
-                cornersAdded++;
-            }
-        }
-
-
+        static double duration_count_loop;
+        start = std::chrono::high_resolution_clock::now();
         //loop over lines in subject polygon (XTEMP). Most of runtime here!
-        for (size_type j = 0, l = HCX.index(NS1, 1), e = NV1; j < e; ++j, ++l) {
+        for (size_type j = 0, e = NV1; j < e; ++j) {
             //grab line endpoints
             Real64 x1 = XTEMP1[j];
             Real64 y1 = YTEMP1[j];
@@ -3972,10 +3942,9 @@ namespace SolarShading {
                 continue;
             }
 
-
             Real64 x_1 = x1 + p2 * maxP;
             Real64 y_1 = y1 + p4 * maxP;
-            if (arrc == 0 || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
+            if (arrc == 0  || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
                 arrx[arrc] = x_1;
                 arry[arrc] = y_1;
                 arrc += 1;
@@ -3988,24 +3957,70 @@ namespace SolarShading {
                 arrc += 1;
             }
         } 
+        stop = std::chrono::high_resolution_clock::now(); 
+        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        duration_count_loop += duration.count();
+        std::cout << "duration_count_loop = " << duration_count_loop << "\n";
 
         NV3 = arrc;
 
+        int cornersAdded = 0;
+        //add each corner if it is inside subject polygon
+        static double duration_count_corn;
+        start = std::chrono::high_resolution_clock::now();
+        for (int k = 0; k < 4; k++) {
+            Real64 cx;
+            Real64 cy;
+            if (k == 0) {
+                cx = minX;
+                cy = minY;
+            } else if (k == 1) {
+                cx = minX;
+                cy = maxY;
+            } else if (k == 2) {
+                cx = maxX;
+                cy = maxY;
+            } else if (k == 3) {
+                cx = maxX;
+                cy = minY;
+            }
+            int i;
+            int j;
+            bool insideFlag = false;
+            
+            for (i = 0, j = NV1-1; i < NV1; j = i++) {
+                if ((YTEMP1[i] > cy) != (YTEMP1[j] > cy) &&
+                    (cx < (XTEMP1[j] - XTEMP1[i]) * (cy - YTEMP1[i]) / (YTEMP1[j]-YTEMP1[i]) + XTEMP1[i])) {
+                    insideFlag = !insideFlag;
+                }
+            }
+            if (insideFlag) {
+                arrx[arrc] = cx;
+                arry[arrc] = cy;
+                arrc += 1;
+                cornersAdded++;
+            }
+        }
+        stop = std::chrono::high_resolution_clock::now(); 
+        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        duration_count_corn += duration.count();
+        std::cout << "duration_count_corn = " << duration_count_corn << "\n";
 
+        static double duration_count_sort;
+        start = std::chrono::high_resolution_clock::now();
         //Sort vertices clockwise around center of final polygon, into TEMP
         //Use insertion sort
-         
-        if (NV3 > 2) {
+        if (arrc > 2) {
             Real64 centerX = 0;
             Real64 centerY = 0;
             //use center of mass
-            for (int i = 0; i < NV3; i++) {
+            for (int i = 0; i < arrc; i++) {
                 centerX += arrx[i];
                 centerY += arry[i];
             }
-            centerX /= NV3;
-            centerY /= NV3;
-            for (int unsortedBegin = cornersAdded; unsortedBegin < arrc; unsortedBegin++) {
+            centerX /= arrc;
+            centerY /= arrc;
+            for (int unsortedBegin = 0; unsortedBegin < arrc; unsortedBegin++) {
                 Real64 currX = arrx[unsortedBegin];
                 Real64 currY = arry[unsortedBegin];
                 int j3 = unsortedBegin - 1;
@@ -4024,14 +4039,33 @@ namespace SolarShading {
                 arry[j3 + 1] = currY;
             }
         }
+        stop = std::chrono::high_resolution_clock::now(); 
+        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        duration_count_sort += duration.count();
+        std::cout << "duration_count_sort = " << duration_count_sort << "\n";
 
         //make uniq list of points -- potential source of error here, when slight error causes points
         // that are supposed to be the same are both kept
         // if done after sort: then can be done in linear runtime: todo
-         
+        static double duration_count_uniq;
+        start = std::chrono::high_resolution_clock::now(); 
         Real64 thresh = 10;
         int incr = 0;
+        Real64 lastX;
+        Real64 lastY;
         for (int p_1 = 0; p_1 < arrc; p_1++) {
+            if (p_1 == 0 || (std::abs(lastX - arrx[p_1]) > thresh || std::abs(lastY - arry[p_1]) > thresh)) {
+                //New item; add to list
+                lastX = arrx[p_1];
+                lastY = arry[p_1];
+                arrx[incr] = lastX;
+                arry[incr] = lastY;
+                incr++;
+            } //else {
+                //Same item, so skip
+            //}
+            
+            /*
             bool flag = true;
             for (int p_2 = 0; p_2 < p_1; p_2++) {
                 if (std::abs(arrx[p_2] - arrx[p_1]) < thresh && std::abs(arry[p_2]- arry[p_1]) < thresh) {
@@ -4043,16 +4077,21 @@ namespace SolarShading {
                 arrx[incr] = arrx[p_1];
                 arry[incr] = arry[p_1];
                 incr++;
-            }
+            } */
         }
+        stop = std::chrono::high_resolution_clock::now(); 
+        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        duration_count_uniq += duration.count();
+        std::cout << "duration_count_uniq = " << duration_count_uniq << "\n";
+
         arrc = incr;
         NV3 = incr;
         
-
-        for (int k = 0; k < NV3; k++) {
+        for (int k = 0; k < arrc; k++) {
             XTEMP[k] = arrx[k];
             YTEMP[k] = arry[k];
         }
+
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
             Real64 const X_1(XTEMP(1));
@@ -4073,6 +4112,7 @@ namespace SolarShading {
             BTEMP(NV3) = X_1 - X_P1;
             CTEMP(NV3) = X_P1 * Y_1 - Y_P1 * X_1;
         }
+
         //Determine overlap status
         if (NV3 < 3) {
             OverlapStatus = NoOverlap;
@@ -4181,8 +4221,6 @@ namespace SolarShading {
         Real64 W; // Normalization factor
         Real64 HFunct;
 
-        static double duration_count;
-        auto start = std::chrono::high_resolution_clock::now();
 #ifdef EP_Count_Calls
         ++NumClipPoly_Calls;
 #endif
@@ -4225,24 +4263,20 @@ namespace SolarShading {
                 }
             }
         }
-/* 
-         
+ 
+ /*   
         Real64 XrectOut[160];
         Real64 YrectOut[160];
         int rectOut = 0;
         Real64 XrefOut[160];
         Real64 YrefOut[160];
         int refOut = 0;
-*/
+*/      
 
         if (rectFlag) {
             CLIPRECT(NS1, NS2, NV1, NV3);
-            auto stop = std::chrono::high_resolution_clock::now(); 
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-            duration_count += duration.count();
-            std::cout << duration_count << "\n";
             return;
-           /*
+            /* 
             if (NV3 > 2) {
                 //PRINT SUBJECT
                 
@@ -4451,7 +4485,7 @@ namespace SolarShading {
         } else if (!INTFLAG) {
             OverlapStatus = FirstSurfWithinSecond;
         }
-        /* 
+        /*
         if (rectFlag) {
             //PRINT SH OUTPUT
             
@@ -4469,11 +4503,7 @@ namespace SolarShading {
                 std::cout << "Yikes\n";
             }
 
-        }*/
-        auto stop = std::chrono::high_resolution_clock::now(); 
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count += duration.count();
-        std::cout << duration_count << "\n";
+        } */
     }
 
 
