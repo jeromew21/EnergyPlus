@@ -3881,7 +3881,9 @@ namespace SolarShading {
         Real64 arrx[40]; //Temp array for output X
         Real64 arry[40]; //Temp array for output Y
         int arrc = 0; //Number of items in output
+        static double duration_count_s;
 
+        auto start = std::chrono::high_resolution_clock::now();
         for (size_type j = 0; j < NV1; ++j) {
             //grab line endpoints
                         Real64 x1 = XTEMP1[j];
@@ -3985,63 +3987,161 @@ namespace SolarShading {
             }
         }
         NV3 = arrc;
+        auto stop = std::chrono::high_resolution_clock::now(); 
+auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+duration_count_s += duration.count();
+std::cout << duration_count_s << "\n";
+
+        
+        static double duration_count;
+
+        start = std::chrono::high_resolution_clock::now();
 
         if (NV3 > 1) {
-            Real64 EdgeIndex;
-            Real64 LastEdgeIndex = -1;
+
+            int EdgeIndex = -1;
+            int LastEdgeIndex = -1;
             int incr = 0;
+            //std::cout << "arrc = " << arrc << "\n";
             Real64 edges[4] = { minX, maxY, maxX, minY };
             for (int i = 0; i <= arrc; i++) { 
                 int k = i;
-                if (i == arrc) k = 0;
+                if (i == arrc) {
+                    k = 0;
+                }
                 Real64 currX = arrx[k];
                 Real64 currY = arry[k];
+                std::cout << "\ni = " << i << "\n";
+                std::cout << "k = " << k << "\n";
+                std::cout << "curr (" << currX << ", " << currY << ")\n";
+                
+                
                 int edgeCount = 0;
+                EdgeIndex = -1;
                 for (int m = 0; m < 4; m++) {
                     if (m%2 == 0) { //MinX or MaxX
-                        if (currX == edges[m]) {
+                        if (d_eq(currX, edges[m])) {
                             edgeCount ++;
                             EdgeIndex = m;
                         }
                     } else { //MinY or MaxY
-                        if (currY == edges[m]) {
+                        if (d_eq(currY, edges[m])) {
                             edgeCount ++;
                             EdgeIndex = m;
                         }
                     }
                 }
+                std::cout << "EdgeCount = " << edgeCount << "\n";
                 if (edgeCount == 0) { //On inside
                     if (i != arrc) {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
+                        std::cout << "Adding inside " << currX << ", " << currY << "\n";
                     }
                     continue;
                 }
                 if (edgeCount > 1) { //On corner
-                    if (i != arrc) {
-                        XTEMP[incr] = currX;
-                        YTEMP[incr] = currY;
-                        incr ++;
+                    if (d_eq(currX, minX) && d_eq(currY, minY)) {
+                        EdgeIndex = 3;
+                    } else if (d_eq(currX, minX) && d_eq(currY, maxY)) {
+                        EdgeIndex = 0;
+                    } else if (d_eq(currX, maxX) && d_eq(currY, maxY)) {
+                        EdgeIndex = 1;
+                    } else if (d_eq(currX, maxX) && d_eq(currY, minY)) {
+                        EdgeIndex = 2;
+                    } else {
+                        EdgeIndex = -1; //shouldn't happen lol
                     }
-                    LastEdgeIndex = -1;
-                    continue;
                 }
+                std::cout << "LastEdgeIndex = " << LastEdgeIndex << "\n";
+                std::cout << "EdgeIndex = " << EdgeIndex << "\n";
                 //On an DIFFERENT edge
-                if (LastEdgeIndex > -1 && LastEdgeIndex != EdgeIndex) {
+                if ((LastEdgeIndex > -1 && EdgeIndex > -1) && LastEdgeIndex != EdgeIndex) {
                     Real64 cornerX;
                     Real64 cornerY;
                     if ((EdgeIndex == 0 && LastEdgeIndex == 3) || (EdgeIndex - LastEdgeIndex == 1)) {
                         // Clockwise single jump
-                        if (EdgeIndex%2 == 0) {}
+                        std::cout << "single jump\n";
+                        if (EdgeIndex%2 == 0) {
                             cornerX = edges[EdgeIndex];
                             cornerY = edges[LastEdgeIndex];
                         } else {
                             cornerX = edges[LastEdgeIndex];
                             cornerY = edges[EdgeIndex];
                         }
+                        std::cout << "corner: (" << cornerX << ", " << cornerY << ")\n";
+                        bool insideFlag = false;
+                        for (int b = 0, j = NV1-1; b < NV1; j = b++) {
+                            if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
+                                (cornerX < (XTEMP1[j] - XTEMP1[b]) * (cornerY - YTEMP1[b]) / (YTEMP1[j]-YTEMP1[b]) + XTEMP1[b])) {
+                                insideFlag = !insideFlag;
+                            }
+                        }
+                        std::cout << "insideFlag: " << insideFlag << "\n";
+                        if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
+                            XTEMP[incr] = cornerX;
+                            YTEMP[incr] = cornerY;
+                            incr ++;
+                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
+                        }
                     } else if (EdgeIndex%2 == LastEdgeIndex%2) {
                         // Clockwise double jump
+                        //std::cout << "double jump\n";
+                        if (LastEdgeIndex == 0) {
+                            cornerX = minX;
+                            cornerY = maxY;
+                        } else if (LastEdgeIndex == 1) {
+                            cornerX = maxX;
+                            cornerY = maxY;
+                        } else if (LastEdgeIndex == 2) {
+                            cornerX = maxX;
+                            cornerY = minY;
+                        } else {
+                            cornerX = minX;
+                            cornerY = minY;
+                        }
+                        bool insideFlag = false;
+                        for (int b = 0, j = NV1-1; b < NV1; j = b++) {
+                            if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
+                                (cornerX < (XTEMP1[j] - XTEMP1[b]) * (cornerY - YTEMP1[b]) / (YTEMP1[j]-YTEMP1[b]) + XTEMP1[b])) {
+                                insideFlag = !insideFlag;
+                            }
+                        }
+                        std::cout << "insideFlag: " << insideFlag << "\n";
+                        if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
+                            XTEMP[incr] = cornerX;
+                            YTEMP[incr] = cornerY;
+                            incr ++;
+                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
+                        }
+                        if (LastEdgeIndex == 3) {
+                            cornerX = minX;
+                            cornerY = maxY;
+                        } else if (LastEdgeIndex == 0) {
+                            cornerX = maxX;
+                            cornerY = maxY;
+                        } else if (LastEdgeIndex == 1) {
+                            cornerX = maxX;
+                            cornerY = minY;
+                        } else {
+                            cornerX = minX;
+                            cornerY = minY;
+                        }
+                        insideFlag = false;
+                        for (int b = 0, j = NV1-1; b < NV1; j = b++) {
+                            if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
+                                (cornerX < (XTEMP1[j] - XTEMP1[b]) * (cornerY - YTEMP1[b]) / (YTEMP1[j]-YTEMP1[b]) + XTEMP1[b])) {
+                                insideFlag = !insideFlag;
+                            }
+                        }
+                        std::cout << "insideFlag: " << insideFlag << "\n";
+                        if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
+                            XTEMP[incr] = cornerX;
+                            YTEMP[incr] = cornerY;
+                            incr ++;
+                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
+                        }
                     } else {
                         // Clockwise triple jump
                     }
@@ -4049,18 +4149,28 @@ namespace SolarShading {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
+                        std::cout << "Adding pt " << currX << ", " << currY << "\n";
                     }
                 } else { //Same edge
                     if (i != arrc) {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
+                        std::cout << "Adding pt R " << currX << ", " << currY << "\n";
                     }
                 }
                 LastEdgeIndex = EdgeIndex;
+               
+
             }
-            
+            NV3 = incr;
+             
         }
+
+        stop = std::chrono::high_resolution_clock::now(); 
+        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+        duration_count += duration.count();
+        std::cout << duration_count << "\n";
 
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
@@ -4119,7 +4229,7 @@ namespace SolarShading {
             //std::cout << "smol\n";
             return true;
         }
-        Real64 threshold = 10;
+        Real64 threshold = 20;
         for (int offset = 0; offset < al1; offset++ )
         {
             bool isEqual = true;
