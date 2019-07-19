@@ -3854,10 +3854,6 @@ namespace SolarShading {
     void CLIPRECT(int const NS1, int const NS2, int const NV1, int &NV3) {
         typedef Array2D<Int64>::size_type size_type;
 
-        auto start = std::chrono::high_resolution_clock::now();
-        auto stop = std::chrono::high_resolution_clock::now(); 
-        auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-
         auto l(HCA.index(NS2, 1));
         Real64 maxX = HCX[l];
         Real64 minX = HCX[l];
@@ -3877,14 +3873,6 @@ namespace SolarShading {
                 minY = HCY[l];
             }
         }
-        /* 
-        double rect_arr[4] = {-1*minX, maxX, -1*minY, maxY};
-        __m256d rect_c = _mm256_load_pd(rect_arr);
-        static double pos_high_arr[4] = {1, -1, 1, -1};
-        static double neg_high_arr[4] = {-1, 1, -1, 1};
-        static __m256d pos_high = _mm256_load_pd(pos_high_arr);
-        static __m256d neg_high = _mm256_load_pd(neg_high_arr);
-        */
 
         for (int P = 1; P <= NV1; ++P) {
             XTEMP1(P) = XTEMP(P); //Copy subject polygon
@@ -3894,111 +3882,9 @@ namespace SolarShading {
         Real64 arry[40]; //Temp array for output Y
         int arrc = 0; //Number of items in output
 
-        //static double duration_count_loop;
-        //start = std::chrono::high_resolution_clock::now();
-
-        //loop over lines in subject polygon (XTEMP). Most of runtime here!
-        //std::cout << "\n\n";
         for (size_type j = 0; j < NV1; ++j) {
             //grab line endpoints
-                  /*  
-            {
-                double line[8];
-                double P_out[4];
-                double Q_out[4];
-                double U_out[4];  
-                line[0] = XTEMP1[j];
-                line[1] = XTEMP1[j];
-                line[2] = YTEMP1[j];
-                line[3] = YTEMP1[j];
-                if (j + 1 >= NV1) {
-                    line[4] = XTEMP1[0];
-                    line[5] = XTEMP1[0];
-                    line[6] = YTEMP1[0];
-                    line[7] = YTEMP1[0];
-                } else {
-                    line[4] = XTEMP1[j+1];
-                    line[5] = XTEMP1[j+1];
-                    line[6] = YTEMP1[j+1];
-                    line[7] = YTEMP1[j+1];
-                }
-
-                __m256d P_0 = _mm256_load_pd(line);
-
-                __m256d p = _mm256_mul_pd(_mm256_sub_pd(_mm256_load_pd(line + 4), P_0), neg_high);
-                __m256d q = _mm256_add_pd(_mm256_mul_pd(P_0, pos_high), rect_c);
-
-            
-                _mm256_store_pd(P_out, p);
-                _mm256_store_pd(Q_out, q);
-
-                if ((P_out[0] == 0 && (Q_out[0] < 0 || Q_out[1] < 0)) ||
-                    (P_out[2] == 0 && (Q_out[2] < 0 || Q_out[3] < 0)))
-                {
-                continue;
-                }
-
-                __m256d u = _mm256_div_pd(q, p);
-                _mm256_store_pd(U_out, u);
-
-                double u1(0); //to max
-                double u2(1); //to min
-
-                if (P_out[0] < 0) {
-                    if (U_out[0] > u1) {
-                        u1 = U_out[0];
-                    }
-                    if (U_out[1] < u2) {
-                        u2 =  U_out[1];
-                    }
-                } else if (P_out[0] > 0) {
-                    if (U_out[1] > u1) {
-                        u1 =  U_out[1];
-                    }
-                    if (U_out[0] < u2) {
-                        u2 = U_out[0];
-                    }
-                }
-
-                if (P_out[2] < 0) {
-                    if (U_out[2] > u1) {
-                        u1 = U_out[2];
-                    }
-                    if (U_out[3] < u2) {
-                        u2 = U_out[3];
-                    }
-                } else if (P_out[2] > 0) {
-                    if (U_out[3] > u1) {
-                        u1 = U_out[3];
-                    }
-                    if (U_out[2] < u2) {
-                        u2 = U_out[2];
-                    }
-                }
-                
-                if (u1 > u2) {
-                continue;
-                }
-
-                Real64 x_1 = line[0] + P_out[1] * u1;
-                Real64 y_1 = line[2] + P_out[3] * u1;
-                if (arrc == 0  || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
-                    arrx[arrc] = x_1;
-                    arry[arrc] = y_1;
-                    arrc += 1;
-                }
-                x_1 = line[0] + P_out[1] * u2;
-                y_1 = line[2] + P_out[3] * u2;
-                if (arrc == 0 || (arrx[arrc-1] != x_1 || arry[arrc-1] != y_1)) {
-                    arrx[arrc] = x_1;
-                    arry[arrc] = y_1;
-                    arrc += 1;
-                } 
-            }
-            */ 
-            
-             //grab line endpoints
-            Real64 x1 = XTEMP1[j];
+                        Real64 x1 = XTEMP1[j];
             Real64 y1 = YTEMP1[j];
             Real64 x2;
             Real64 y2;
@@ -4069,6 +3955,7 @@ namespace SolarShading {
             if (startT >= endT) { //reject
                 continue;
             }
+  /*
             std::cout << "Rect: " << "(" << minX << ", " << minY << "),"
                                   << "(" << minX << ", " << maxY << "),"
                                   << "(" << maxX << ", " << maxY << "),"
@@ -4078,7 +3965,7 @@ namespace SolarShading {
             std::cout <<  "Q = <" << q1 << ", " << q2 << ", " << q3 << ", " << q4 << ">\n";
             std::cout <<  "R = <" << r1 << ", " << r2 << ", " << r3 << ", " << r4 << ">\n";
             std::cout << "u1 = " << startT << ", u1 = " << endT << "\n";
-
+*/
             Real64 x_1 = x1 + p2 * startT;
             Real64 y_1 = y1 + p4 * startT;
             Real64 x_2 = x1 + p2 * endT;
@@ -4088,131 +3975,92 @@ namespace SolarShading {
                 arrx[arrc] = x_1;
                 arry[arrc] = y_1;
                 arrc += 1;
-                std::cout << "Adding u1 " << x_1 << ", " << y_1 << "\n";
+                //std::cout << "Adding u1 " << x_1 << ", " << y_1 << "\n";
             }
             if (arrc == 0 || (neq(arrx[arrc-1], x_2) || neq(arry[arrc-1], y_2)) && (neq(arrx[0], x_2) || neq(arry[0], y_2))) {
                 arrx[arrc] = x_2;
                 arry[arrc] = y_2;
                 arrc += 1;
-                std::cout << "Adding u2 " << x_2 << ", " << y_2 << "\n";
+                //std::cout << "Adding u2 " << x_2 << ", " << y_2 << "\n";
             }
         }
         NV3 = arrc;
-        //stop = std::chrono::high_resolution_clock::now(); 
-        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count_loop += duration.count();
-        //std::cout << "duration_count_loop = " << duration_count_loop << "\n";
-        /*
-        int cornersAdded = 0;
-        NV3 = arrc;
-        //add each corner if it is inside subject polygon
-        //static double duration_count_corn;
-        ///start = std::chrono::high_resolution_clock::now();
-         
-        for (int k = 0; k < 4; k++) {
-            Real64 cx;
-            Real64 cy;
-            if (k == 0) {
-                cx = minX;
-                cy = minY;
-            } else if (k == 1) {
-                cx = minX;
-                cy = maxY;
-            } else if (k == 2) {
-                cx = maxX;
-                cy = maxY;
-            } else if (k == 3) {
-                cx = maxX;
-                cy = minY;
-            }
-            int i;
-            int j;
-            bool insideFlag = false;
 
-            for (i = 0, j = NV1-1; i < NV1; j = i++) {
-                if ((YTEMP1[i] > cy) != (YTEMP1[j] > cy) &&
-                    (cx < (XTEMP1[j] - XTEMP1[i]) * (cy - YTEMP1[i]) / (YTEMP1[j]-YTEMP1[i]) + XTEMP1[i])) {
-                    insideFlag = !insideFlag;
+        if (NV3 > 1) {
+            Real64 EdgeIndex;
+            Real64 LastEdgeIndex = -1;
+            int incr = 0;
+            Real64 edges[4] = { minX, maxY, maxX, minY };
+            for (int i = 0; i <= arrc; i++) { 
+                int k = i;
+                if (i == arrc) k = 0;
+                Real64 currX = arrx[k];
+                Real64 currY = arry[k];
+                int edgeCount = 0;
+                for (int m = 0; m < 4; m++) {
+                    if (m%2 == 0) { //MinX or MaxX
+                        if (currX == edges[m]) {
+                            edgeCount ++;
+                            EdgeIndex = m;
+                        }
+                    } else { //MinY or MaxY
+                        if (currY == edges[m]) {
+                            edgeCount ++;
+                            EdgeIndex = m;
+                        }
+                    }
                 }
-            }
-            if (insideFlag) {
-                arrx[arrc] = cx;
-                arry[arrc] = cy;
-                arrc += 1;
-                cornersAdded++;
-            }
-        }
-        //stop = std::chrono::high_resolution_clock::now(); 
-        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count_corn += duration.count();
-        //std::cout << "duration_count_corn = " << duration_count_corn << "\n";
-        //static double duration_count_sort;
-        //start = std::chrono::high_resolution_clock::now();
-        //Sort vertices clockwise around center of final polygon, into TEMP
-        //Use insertion sort
-        if (arrc > 2) {
-            Real6 - dx2/(fabs(dx2)+fabs(dy2)),dy2)) {
-                    arrx[j3 + 1] = arrx[j3];
-                    arry[j3 + 1] = arry[j3];
-                    j3 --;
-                    dx2 = arrx[j3] - centerX;
-                    dy2 = arry[j3] - centerY;
+                if (edgeCount == 0) { //On inside
+                    if (i != arrc) {
+                        XTEMP[incr] = currX;
+                        YTEMP[incr] = currY;
+                        incr ++;
+                    }
+                    continue;
                 }
-                arrx[j3 + 1] = currX;
-                arry[j3 + 1] = currY;
+                if (edgeCount > 1) { //On corner
+                    if (i != arrc) {
+                        XTEMP[incr] = currX;
+                        YTEMP[incr] = currY;
+                        incr ++;
+                    }
+                    LastEdgeIndex = -1;
+                    continue;
+                }
+                //On an DIFFERENT edge
+                if (LastEdgeIndex > -1 && LastEdgeIndex != EdgeIndex) {
+                    Real64 cornerX;
+                    Real64 cornerY;
+                    if ((EdgeIndex == 0 && LastEdgeIndex == 3) || (EdgeIndex - LastEdgeIndex == 1)) {
+                        // Clockwise single jump
+                        if (EdgeIndex%2 == 0) {}
+                            cornerX = edges[EdgeIndex];
+                            cornerY = edges[LastEdgeIndex];
+                        } else {
+                            cornerX = edges[LastEdgeIndex];
+                            cornerY = edges[EdgeIndex];
+                        }
+                    } else if (EdgeIndex%2 == LastEdgeIndex%2) {
+                        // Clockwise double jump
+                    } else {
+                        // Clockwise triple jump
+                    }
+                    if (i != arrc) {
+                        XTEMP[incr] = currX;
+                        YTEMP[incr] = currY;
+                        incr ++;
+                    }
+                } else { //Same edge
+                    if (i != arrc) {
+                        XTEMP[incr] = currX;
+                        YTEMP[incr] = currY;
+                        incr ++;
+                    }
+                }
+                LastEdgeIndex = EdgeIndex;
             }
+            
         }
-        //stop = std::chrono::high_resolution_clock::now(); 
-        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count_sort += duration.count();
-        //std::cout << "duration_count_sort = " << duration_count_sort << "\n";
-        //make uniq list of points -- potential source of error here, when slight error causes points
-        // that are supposed to be the same are both kept
-        // if done after sort: then can be done in linear runtime: todo
-        //static double duration_count_uniq;
-        //start = std::chrono::high_resolution_clock::now(); */
-        /*Real64 thresh = 10;
-        int incr = 0;
-        Real64 lastX;
-        Real64 lastY;
-        for (int p_1 = 0; p_1 < arrc; p_1++) {
-            if (p_1 == 0 || 
-            ((std::abs(lastX - arrx[p_1]) > thresh || std::abs(lastY - arry[p_1]) > thresh) 
-            && (std::abs(arrx[p_1] - arrx[0]) > thresh || std::abs(arry[p_1] - arry[0]) > thresh))) {
-                //New item; add to list
-                lastX = arrx[p_1];
-                lastY = arry[p_1];
-                arrx[incr] = lastX;
-                arry[incr] = lastY;
-                incr++;
-            } //else {
-                //Same item, so skip
-            //}
-        }
-        */
-        //stop = std::chrono::high_resolution_clock::now(); 
-        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count_uniq += duration.count();
-        //std::cout << "duration_count_uniq = " << duration_count_uniq << "\n";
-
-        //arrc = incr;
-        //NV3 = incr;
-        //static double duration_count_test;
-
-        //start = std::chrono::high_resolution_clock::now();
-            lastEdgeIndex = edgeIndex;
-        }
-        NV3 = incr;
-        //stop = std::chrono::high_resolution_clock::now(); 
-        //duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count_test += duration.count();
-        //std::cout << "duration_count_test = " << duration_count_test << "\n";
-        
-
-        /*for (int k = 0; k < arrc; k++) {
-            XTEMP[k] = arrx[k];
-            YTEMP[k] = arry[k];
-        } */
 
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
