@@ -3836,24 +3836,16 @@ namespace SolarShading {
         }
     }
     
-    bool neq(Real64 a, Real64 b) {
+    inline bool neq(Real64 a, Real64 b) {
         return std::abs(a-b) > 2.0;
     }
-    bool d_eq(Real64 a, Real64 b) {
+
+    inline bool d_eq(Real64 a, Real64 b) {
         return std::abs(a-b) < 2.0;
-    }
-    bool leq(Real64 a, Real64 b) {
-        // a <= b
-        return b-a > -2.0;
-    }
-    bool geq(Real64 a, Real64 b) {
-        // a >= b
-        return a-b > -2.0;
     }
 
     void CLIPRECT(int const NS1, int const NS2, int const NV1, int &NV3) {
-        typedef Array2D<Int64>::size_type size_type;
-
+        bool INTFLAG = false;
         auto l(HCA.index(NS2, 1));
         Real64 maxX = HCX[l];
         Real64 minX = HCX[l];
@@ -3881,12 +3873,9 @@ namespace SolarShading {
         Real64 arrx[40]; //Temp array for output X
         Real64 arry[40]; //Temp array for output Y
         int arrc = 0; //Number of items in output
-        static double duration_count_s;
-
-        auto start = std::chrono::high_resolution_clock::now();
-        for (size_type j = 0; j < NV1; ++j) {
+        for (int j = 0; j < NV1; ++j) {
             //grab line endpoints
-                        Real64 x1 = XTEMP1[j];
+            Real64 x1 = XTEMP1[j];
             Real64 y1 = YTEMP1[j];
             Real64 x2;
             Real64 y2;
@@ -3957,17 +3946,11 @@ namespace SolarShading {
             if (startT >= endT) { //reject
                 continue;
             }
-  /*
-            std::cout << "Rect: " << "(" << minX << ", " << minY << "),"
-                                  << "(" << minX << ", " << maxY << "),"
-                                  << "(" << maxX << ", " << maxY << "),"
-                                  << "(" << maxX << ", " << minY << ")\n";
-            std::cout << "Line: " << "(" << x1 << ", " << y1 << ")" << ", " << "(" << x2 << ", " << y2 << ")\n"; 
-            std::cout <<  "P = <" << p1 << ", " << p2 << ", " << p3 << ", " << p4 << ">\n";
-            std::cout <<  "Q = <" << q1 << ", " << q2 << ", " << q3 << ", " << q4 << ">\n";
-            std::cout <<  "R = <" << r1 << ", " << r2 << ", " << r3 << ", " << r4 << ">\n";
-            std::cout << "u1 = " << startT << ", u1 = " << endT << "\n";
-*/
+
+            if (startT > 0 || endT < 1) {
+                INTFLAG = true;
+            }
+
             Real64 x_1 = x1 + p2 * startT;
             Real64 y_1 = y1 + p4 * startT;
             Real64 x_2 = x1 + p2 * endT;
@@ -3977,32 +3960,19 @@ namespace SolarShading {
                 arrx[arrc] = x_1;
                 arry[arrc] = y_1;
                 arrc += 1;
-                //std::cout << "Adding u1 " << x_1 << ", " << y_1 << "\n";
             }
             if (arrc == 0 || (neq(arrx[arrc-1], x_2) || neq(arry[arrc-1], y_2)) && (neq(arrx[0], x_2) || neq(arry[0], y_2))) {
                 arrx[arrc] = x_2;
                 arry[arrc] = y_2;
                 arrc += 1;
-                //std::cout << "Adding u2 " << x_2 << ", " << y_2 << "\n";
             }
         }
         NV3 = arrc;
-        auto stop = std::chrono::high_resolution_clock::now(); 
-auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-duration_count_s += duration.count();
-std::cout << duration_count_s << "\n";
-
-        
-        static double duration_count;
-
-        start = std::chrono::high_resolution_clock::now();
 
         if (NV3 > 1) {
-
             int EdgeIndex = -1;
             int LastEdgeIndex = -1;
             int incr = 0;
-            //std::cout << "arrc = " << arrc << "\n";
             Real64 edges[4] = { minX, maxY, maxX, minY };
             for (int i = 0; i <= arrc; i++) { 
                 int k = i;
@@ -4011,10 +3981,6 @@ std::cout << duration_count_s << "\n";
                 }
                 Real64 currX = arrx[k];
                 Real64 currY = arry[k];
-                std::cout << "\ni = " << i << "\n";
-                std::cout << "k = " << k << "\n";
-                std::cout << "curr (" << currX << ", " << currY << ")\n";
-                
                 
                 int edgeCount = 0;
                 EdgeIndex = -1;
@@ -4031,13 +3997,11 @@ std::cout << duration_count_s << "\n";
                         }
                     }
                 }
-                std::cout << "EdgeCount = " << edgeCount << "\n";
                 if (edgeCount == 0) { //On inside
                     if (i != arrc) {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
-                        std::cout << "Adding inside " << currX << ", " << currY << "\n";
                     }
                     continue;
                 }
@@ -4054,15 +4018,12 @@ std::cout << duration_count_s << "\n";
                         EdgeIndex = -1; //shouldn't happen lol
                     }
                 }
-                std::cout << "LastEdgeIndex = " << LastEdgeIndex << "\n";
-                std::cout << "EdgeIndex = " << EdgeIndex << "\n";
                 //On an DIFFERENT edge
                 if ((LastEdgeIndex > -1 && EdgeIndex > -1) && LastEdgeIndex != EdgeIndex) {
                     Real64 cornerX;
                     Real64 cornerY;
                     if ((EdgeIndex == 0 && LastEdgeIndex == 3) || (EdgeIndex - LastEdgeIndex == 1)) {
                         // Clockwise single jump
-                        std::cout << "single jump\n";
                         if (EdgeIndex%2 == 0) {
                             cornerX = edges[EdgeIndex];
                             cornerY = edges[LastEdgeIndex];
@@ -4070,7 +4031,6 @@ std::cout << duration_count_s << "\n";
                             cornerX = edges[LastEdgeIndex];
                             cornerY = edges[EdgeIndex];
                         }
-                        std::cout << "corner: (" << cornerX << ", " << cornerY << ")\n";
                         bool insideFlag = false;
                         for (int b = 0, j = NV1-1; b < NV1; j = b++) {
                             if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
@@ -4078,16 +4038,13 @@ std::cout << duration_count_s << "\n";
                                 insideFlag = !insideFlag;
                             }
                         }
-                        std::cout << "insideFlag: " << insideFlag << "\n";
                         if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
                             XTEMP[incr] = cornerX;
                             YTEMP[incr] = cornerY;
                             incr ++;
-                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
                         }
                     } else if (EdgeIndex%2 == LastEdgeIndex%2) {
                         // Clockwise double jump
-                        //std::cout << "double jump\n";
                         if (LastEdgeIndex == 0) {
                             cornerX = minX;
                             cornerY = maxY;
@@ -4108,12 +4065,10 @@ std::cout << duration_count_s << "\n";
                                 insideFlag = !insideFlag;
                             }
                         }
-                        std::cout << "insideFlag: " << insideFlag << "\n";
                         if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
                             XTEMP[incr] = cornerX;
                             YTEMP[incr] = cornerY;
                             incr ++;
-                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
                         }
                         if (LastEdgeIndex == 3) {
                             cornerX = minX;
@@ -4135,42 +4090,40 @@ std::cout << duration_count_s << "\n";
                                 insideFlag = !insideFlag;
                             }
                         }
-                        std::cout << "insideFlag: " << insideFlag << "\n";
                         if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
                             XTEMP[incr] = cornerX;
                             YTEMP[incr] = cornerY;
                             incr ++;
-                            std::cout << "Adding c " << cornerX << ", " << cornerY << "\n";
                         }
-                    } else {
-                        // Clockwise triple jump
                     }
                     if (i != arrc) {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
-                        std::cout << "Adding pt " << currX << ", " << currY << "\n";
                     }
                 } else { //Same edge
                     if (i != arrc) {
                         XTEMP[incr] = currX;
                         YTEMP[incr] = currY;
                         incr ++;
-                        std::cout << "Adding pt R " << currX << ", " << currY << "\n";
                     }
                 }
                 LastEdgeIndex = EdgeIndex;
-               
-
             }
-            NV3 = incr;
-             
+            NV3 = incr; 
         }
-
-        stop = std::chrono::high_resolution_clock::now(); 
-        duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        duration_count += duration.count();
-        std::cout << duration_count << "\n";
+        
+        for (int JJ = 0; JJ < 1; JJ++) {
+            int xtemp = XTEMP[0];
+            int ytemp = YTEMP[0];
+            int i;
+            for (i = 0; i < NV3-1; i++) {
+                XTEMP[i] = XTEMP[i+1];
+                YTEMP[i] = YTEMP[i+1];
+            }
+            XTEMP[i] = xtemp;
+            YTEMP[i] = ytemp;
+        }
 
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
@@ -4194,59 +4147,13 @@ std::cout << duration_count_s << "\n";
         }
 
         //Determine overlap status
-        if (NV3 < 3) {
+        if (NV3 < 3) { // Determine overlap status
             OverlapStatus = NoOverlap;
+        } else if (!INTFLAG) {
+            OverlapStatus = FirstSurfWithinSecond;
         } else {
-            int insideCount = 0;
-            for (int k_2 = 0; k_2 < NV3; k_2++) {
-                if ((XTEMP[k_2] <= maxX && XTEMP[k_2] >= minX) && (YTEMP[k_2] <= maxY && YTEMP[k_2] >= minY)) {
-                    insideCount ++; // inside
-                }
-            }
-            if (insideCount > 1) { //More than one vertex is inside
-                OverlapStatus = PartialOverlap;
-            }
-            insideCount = 0;
-            for (int k_2 = 0; k_2 < NV1; k_2++) {
-                if ((XTEMP1[k_2] <= maxX && XTEMP1[k_2] >= minX) &&
-                    (YTEMP1[k_2] <= maxY && YTEMP1[k_2] >= minY)) {
-                    insideCount ++;
-                }
-            }
-            if (insideCount == NV3) { //All in subject are inside
-                OverlapStatus = FirstSurfWithinSecond;
-            }
+            OverlapStatus = PartialOverlap;
         }
-    }
-
-    bool rotateEq(Real64* ax1, Real64* ay1, Real64* ax2, Real64* ay2, int al1, int al2) {
-        //start at each indice
-        if (al1 != al2) {
-            //std::cout << "diff num\n";
-            return false;
-        }
-        if (al1 < 3) {
-            //std::cout << "smol\n";
-            return true;
-        }
-        Real64 threshold = 20;
-        for (int offset = 0; offset < al1; offset++ )
-        {
-            bool isEqual = true;
-            for (int i = 0; i < al1; i++) {
-                if (std::abs(ax1[i] - ax2[(i+offset)%al1]) > threshold || std::abs(ay1[i] - ay2[(i+offset)%al1]) > threshold) {
-                    
-                    isEqual = false;
-                    break;
-                }
-            }
-            if (isEqual) {
-                //std::cout << "is eq\n";
-                return true;
-            }
-        }
-            //std::cout << "no rotation found\n";
-        return false;
     }
 
     void CLIPPOLY(int const NS1, // Figure number of figure 1 (The subject polygon)
@@ -4347,64 +4254,18 @@ std::cout << duration_count_s << "\n";
         }
  
    
-        Real64 XrectOut[160];
-        Real64 YrectOut[160];
-        int rectOut = 0;
-        Real64 XrefOut[160];
-        Real64 YrefOut[160];
-        int refOut = 0;
+        static double duration_count;
+        auto start = std::chrono::high_resolution_clock::now();
+
       
-        static int tot = 0;
-        static int idSave = 62878;
         if (rectFlag) {
             CLIPRECT(NS1, NS2, NV1, NV3);
-            //auto stop = std::chrono::high_resolution_clock::now(); 
-            // auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-            //duration_count += duration.count();
-
-            if (NV3 > 2) {
-
-                //PRINT CLIPPING
-                std::cout << "Clipping " << NV2 << ": ";
-                for (int k = HCX.index(NS2, 1), m = 0; m < NV2; m++, k++) {
-                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
-                    if (m < NV2-1) {
-                        std::cout << ", ";
-                    }
-                }
-                //PRINT SUBJECT
-                std::cout << "\nSubject " << NV1 << ": ";
-                for (int k = HCX.index(NS1, 1), m = 0; m < NV1; m++, k++) {
-                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
-                    if (m < NV1-1) {
-                        std::cout << ", ";
-                    }
-                }
-                //PRINT CLIPRECT OUTPUT
-                std::cout << "\nRect Output " << NV3 << ": ";
-                 for (int k = 0; k < NV3; k++) {
-                    std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
-                    if (k < NV3-1) {
-                        std::cout << ", ";
-                    }
-                    XrectOut[rectOut] = XTEMP[k];
-                    YrectOut[rectOut] = YTEMP[k];
-                    rectOut++;
-
-                }
-
-                //RESET XTEMP/YTEMP
-                for (size_type j = 0, l = HCX.index(NS1, 1), e = NV1; j < e; ++j, ++l) {
-                    XTEMP[j] = HCX[l]; // [ l ] == ( NS1, j+1 )
-                    YTEMP[j] = HCY[l];
-                    ATEMP[j] = HCA[l];
-                    BTEMP[j] = HCB[l];
-                    CTEMP[j] = HCC[l];
-                }
-            } else {
-                rectFlag = false;
-            }
+            auto stop = std::chrono::high_resolution_clock::now(); 
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+            duration_count += duration.count();
+            return;
         }
+
         auto l(HCA.index(NS2, 1));
         for (int E = 1; E <= NV2; ++E, ++l) { // Loop over edges of the clipping polygon\n
             for (int P = 1; P <= NVOUT; ++P) {
@@ -4566,36 +4427,11 @@ std::cout << duration_count_s << "\n";
         } else if (!INTFLAG) {
             OverlapStatus = FirstSurfWithinSecond;
         }
-        static int passed = 0;
-        static int failed = 0;
-        if (rectFlag) {
-            //PRINT SH OUTPUT
-          tot++;
-            std::cout << "\nRef Output " << NV3 << ": ";
-            for (int k = 0; k < NV3; k++) {
-                std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
-                if (k < NV3-1) {
-                    std::cout << ", ";
-                }
-                XrefOut[refOut] = XTEMP[k];
-                YrefOut[refOut] = YTEMP[k];
-                refOut++;
-            }
-            if (!rotateEq(XrectOut, YrectOut, XrefOut, YrefOut, rectOut, refOut)) {
-                std::cout << "Yikes\n";
-                failed ++;
-                exit(0);
-            } else {
-                std::cout << "Good\n";
-                passed ++;
-            }
-            std::cout << "ID " << tot << "\n";
-        }
-        std::cout << passed << " / " << tot << " passed.\n";
-        //auto stop = std::chrono::high_resolution_clock::now(); 
-        //auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-        //duration_count += duration.count();
-        //std::cout << duration_count << "\n";
+        
+            auto stop = std::chrono::high_resolution_clock::now(); 
+            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
+            duration_count += duration.count();
+            //std::cout << duration_count << "\n";
     }
 
 
