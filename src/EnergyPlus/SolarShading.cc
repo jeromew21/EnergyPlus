@@ -3956,12 +3956,12 @@ namespace SolarShading {
             Real64 x_2 = x1 + p2 * endT;
             Real64 y_2 = y1 + p4 * endT;
             //if line on edge, or inside, add both points
-            if (arrc == 0 || (neq(arrx[arrc-1], x_1) || neq(arry[arrc-1], y_1)) && (neq(arrx[0], x_1) || neq(arry[0], y_1))) {
+            if (arrc == 0 || ((neq(arrx[arrc-1], x_1) || neq(arry[arrc-1], y_1)) && (neq(arrx[0], x_1) || neq(arry[0], y_1)))) {
                 arrx[arrc] = x_1;
                 arry[arrc] = y_1;
                 arrc += 1;
             }
-            if (arrc == 0 || (neq(arrx[arrc-1], x_2) || neq(arry[arrc-1], y_2)) && (neq(arrx[0], x_2) || neq(arry[0], y_2))) {
+            if (arrc == 0 || ((neq(arrx[arrc-1], x_2) || neq(arry[arrc-1], y_2)) && (neq(arrx[0], x_2) || neq(arry[0], y_2)))) {
                 arrx[arrc] = x_2;
                 arry[arrc] = y_2;
                 arrc += 1;
@@ -4112,18 +4112,7 @@ namespace SolarShading {
             }
             NV3 = incr; 
         }
-        
-        for (int JJ = 0; JJ < 1; JJ++) {
-            int xtemp = XTEMP[0];
-            int ytemp = YTEMP[0];
-            int i;
-            for (i = 0; i < NV3-1; i++) {
-                XTEMP[i] = XTEMP[i+1];
-                YTEMP[i] = YTEMP[i+1];
-            }
-            XTEMP[i] = xtemp;
-            YTEMP[i] = ytemp;
-        }
+    
 
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
@@ -4154,6 +4143,33 @@ namespace SolarShading {
         } else {
             OverlapStatus = PartialOverlap;
         }
+    }
+
+    bool rotateEq(Real64* ax1, Real64* ay1, Real64* ax2, Real64* ay2, int al1, int al2) {
+        //start at each indice
+        if (al1 != al2) {
+            std::cout << "diff num\n";
+            return false;
+        }
+       
+        Real64 threshold = 10;
+        for (int offset = 0; offset < al1; offset++ )
+        {
+            bool isEqual = true;
+            for (int i = 0; i < al1; i++) {
+                if (std::abs(ax1[i] - ax2[(i+offset)%al1]) > threshold || std::abs(ay1[i] - ay2[(i+offset)%al1]) > threshold) {
+                    
+                    isEqual = false;
+                    break;
+                }
+            }
+            if (isEqual) {
+                //std::cout << "is eq\n";
+                return true;
+            }
+        }
+            std::cout << "no rotation found\n";
+        return false;
     }
 
     void CLIPPOLY(int const NS1, // Figure number of figure 1 (The subject polygon)
@@ -4254,18 +4270,65 @@ namespace SolarShading {
         }
  
    
-        static double duration_count;
-        auto start = std::chrono::high_resolution_clock::now();
+        Real64 XrectOut[160];
+        Real64 YrectOut[160];
+        int rectOut = 0;
+        Real64 XrefOut[160];
+        Real64 YrefOut[160];
+        int refOut = 0;
+    
 
-      
         if (rectFlag) {
             CLIPRECT(NS1, NS2, NV1, NV3);
-            auto stop = std::chrono::high_resolution_clock::now(); 
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-            duration_count += duration.count();
-            return;
-        }
+            
+            
+            if (NV3 > 1) {
+                //PRINT SUBJECT
+                
+                std::cout << "\n\nSubject " << NV1 << ": ";
+                for (int k = HCX.index(NS1, 1), m = 0; m < NV1; m++, k++) {
+                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
+                    if (m < NV1-1) {
+                        std::cout << ", ";
+                    }
+                }
 
+                //PRINT CLIPPING
+                std::cout << "\nClipping " << NV2 << ": ";
+                for (int k = HCX.index(NS2, 1), m = 0; m < NV2; m++, k++) {
+                    std::cout << "(" << HCX[k] << ", " << HCY[k] << ")";
+                    if (m < NV2-1) {
+                        std::cout << ", ";
+                    }
+                }
+                
+                //PRINT CLIPRECT OUTPUT
+                std::cout << "\nRect Output " << NV3 << ": ";
+                 for (int k = 0; k < NV3; k++) {
+                    std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
+                    if (k < NV3-1) {
+                        std::cout << ", ";
+                    }
+                    XrectOut[rectOut] = XTEMP[k];
+                    YrectOut[rectOut] = YTEMP[k];
+                    rectOut++;
+                    
+                }
+                
+                //RESET XTEMP/YTEMP
+                for (size_type j = 0, l = HCX.index(NS1, 1), e = NV1; j < e; ++j, ++l) {
+                    XTEMP[j] = HCX[l]; // [ l ] == ( NS1, j+1 )
+                    YTEMP[j] = HCY[l];
+                    ATEMP[j] = HCA[l];
+                    BTEMP[j] = HCB[l];
+                    CTEMP[j] = HCC[l];
+                } 
+            } else {
+                rectFlag = false;
+            } 
+            
+        }
+ 
         auto l(HCA.index(NS2, 1));
         for (int E = 1; E <= NV2; ++E, ++l) { // Loop over edges of the clipping polygon\n
             for (int P = 1; P <= NVOUT; ++P) {
@@ -4427,11 +4490,26 @@ namespace SolarShading {
         } else if (!INTFLAG) {
             OverlapStatus = FirstSurfWithinSecond;
         }
+        if (rectFlag) {
+            //PRINT SH OUTPUT
+            
+            std::cout << "\nRef Output " << NV3 << ": ";
+            for (int k = 0; k < NV3; k++) {
+                std::cout << "(" << XTEMP[k] << ", " << YTEMP[k] << ")";
+                if (k < NV3-1) {
+                    std::cout << ", ";
+                }
+                XrefOut[refOut] = XTEMP[k];
+                YrefOut[refOut] = YTEMP[k];
+                refOut++;
+            } 
+            if (!rotateEq(XrectOut, YrectOut, XrefOut, YrefOut, rectOut, refOut)) {
+                std::cout << "Yikes\n";
+                exit(0);
+            }
+
+        } 
         
-            auto stop = std::chrono::high_resolution_clock::now(); 
-            auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
-            duration_count += duration.count();
-            //std::cout << duration_count << "\n";
     }
 
 
