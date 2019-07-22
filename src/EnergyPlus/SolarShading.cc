@@ -3865,6 +3865,8 @@ namespace SolarShading {
                 minY = HCY[l];
             }
         }
+        int cornerXs[4] = {minX, minX, maxX, maxX};
+        int cornerYs[4] = {minY, maxY, maxY, minY};
 
         for (int P = 1; P <= NV1; ++P) {
             XTEMP1(P) = XTEMP(P); //Copy subject polygon
@@ -3902,6 +3904,7 @@ namespace SolarShading {
 
             
             if ((p1 == 0 && (q1 < 0 || q2 < 0)) || (p3 == 0 && (q3 < 0 || q4 < 0))) {
+                std::cout << p1 << " " << p3 << " "  << q1 << " "  << q2 << " "  << q3 << " "  << q4 << " "  << "\n";
                 continue;
             }
 
@@ -3943,7 +3946,7 @@ namespace SolarShading {
                 }
             }
 
-            if (startT >= endT) { //reject
+            if (startT > endT) { //reject
                 continue;
             }
 
@@ -3953,8 +3956,8 @@ namespace SolarShading {
 
             Real64 x_1 = x1 + p2 * startT;
             Real64 y_1 = y1 + p4 * startT;
-            Real64 x_2 = x1 + p2 * endT;
-            Real64 y_2 = y1 + p4 * endT;
+            Real64 x_2 = x1 + p2 * endT  ;
+            Real64 y_2 = y1 + p4 * endT  ;
             //if line on edge, or inside, add both points
             if (arrc == 0 || ((neq(arrx[arrc-1], x_1) || neq(arry[arrc-1], y_1)) && (neq(arrx[0], x_1) || neq(arry[0], y_1)))) {
                 arrx[arrc] = x_1;
@@ -3969,6 +3972,8 @@ namespace SolarShading {
         }
         NV3 = arrc;
 
+        std::cout << "arrc: " << arrc << "\n";
+
         if (NV3 > 1) {
             int EdgeIndex = -1;
             int LastEdgeIndex = -1;
@@ -3981,6 +3986,8 @@ namespace SolarShading {
                 }
                 Real64 currX = arrx[k];
                 Real64 currY = arry[k];
+
+                std::cout << "curr: " << currX << ", " << currY << "\n";
                 
                 int edgeCount = 0;
                 EdgeIndex = -1;
@@ -3997,6 +4004,7 @@ namespace SolarShading {
                         }
                     }
                 }
+                std::cout << "Edgect: " << edgeCount << "\n";
                 if (edgeCount == 0) { //On inside
                     if (i != arrc) {
                         XTEMP[incr] = currX;
@@ -4018,6 +4026,7 @@ namespace SolarShading {
                         EdgeIndex = -1; //shouldn't happen lol
                     }
                 }
+                std::cout << "Edge: " << LastEdgeIndex << "->" << EdgeIndex << "\n";
                 //On an DIFFERENT edge
                 if ((LastEdgeIndex > -1 && EdgeIndex > -1) && LastEdgeIndex != EdgeIndex) {
                     Real64 cornerX;
@@ -4045,19 +4054,9 @@ namespace SolarShading {
                         }
                     } else if (EdgeIndex%2 == LastEdgeIndex%2) {
                         // Clockwise double jump
-                        if (LastEdgeIndex == 0) {
-                            cornerX = minX;
-                            cornerY = maxY;
-                        } else if (LastEdgeIndex == 1) {
-                            cornerX = maxX;
-                            cornerY = maxY;
-                        } else if (LastEdgeIndex == 2) {
-                            cornerX = maxX;
-                            cornerY = minY;
-                        } else {
-                            cornerX = minX;
-                            cornerY = minY;
-                        }
+                        cornerX = cornerXs[(LastEdgeIndex + 1) % 4];
+                        cornerY = cornerYs[(LastEdgeIndex + 1) % 4];
+                        
                         bool insideFlag = false;
                         for (int b = 0, j = NV1-1; b < NV1; j = b++) {
                             if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
@@ -4070,19 +4069,10 @@ namespace SolarShading {
                             YTEMP[incr] = cornerY;
                             incr ++;
                         }
-                        if (LastEdgeIndex == 3) {
-                            cornerX = minX;
-                            cornerY = maxY;
-                        } else if (LastEdgeIndex == 0) {
-                            cornerX = maxX;
-                            cornerY = maxY;
-                        } else if (LastEdgeIndex == 1) {
-                            cornerX = maxX;
-                            cornerY = minY;
-                        } else {
-                            cornerX = minX;
-                            cornerY = minY;
-                        }
+                        cornerX = cornerXs[(LastEdgeIndex + 2) % 4];
+                        cornerY = cornerYs[(LastEdgeIndex + 2) % 4];
+                        std::cout << "Corner X = " << cornerX <<"\n";
+                        std::cout << "Corner Y = " << cornerY <<"\n";
                         insideFlag = false;
                         for (int b = 0, j = NV1-1; b < NV1; j = b++) {
                             if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
@@ -4094,6 +4084,26 @@ namespace SolarShading {
                             XTEMP[incr] = cornerX;
                             YTEMP[incr] = cornerY;
                             incr ++;
+                        }
+                    } else if ((EdgeIndex == 3 && LastEdgeIndex == 0) || (LastEdgeIndex - EdgeIndex == 1)) {
+                        //Clockwise triple jump
+                        int startIndex = (LastEdgeIndex + 1) % 4;
+                        for (int i1 = startIndex, j1 = 0; j1 < 3; i1 = (i1 + 1) % 4, j1++) {
+                            cornerX = cornerXs[i1];
+                            cornerY = cornerYs[i1];
+                            
+                            bool insideFlag = false;
+                            for (int b = 0, j = NV1-1; b < NV1; j = b++) {
+                                if ((YTEMP1[b] > cornerY) != (YTEMP1[j] > cornerY) &&
+                                    (cornerX < (XTEMP1[j] - XTEMP1[b]) * (cornerY - YTEMP1[b]) / (YTEMP1[j]-YTEMP1[b]) + XTEMP1[b])) {
+                                    insideFlag = !insideFlag;
+                                }
+                            }
+                            if (insideFlag && (incr == 0 || (neq(cornerX, XTEMP[incr-1]) || neq(cornerY, YTEMP[incr-1])))) {
+                                XTEMP[incr] = cornerX;
+                                YTEMP[incr] = cornerY;
+                                incr ++;
+                            }
                         }
                     }
                     if (i != arrc) {
@@ -4113,7 +4123,6 @@ namespace SolarShading {
             NV3 = incr; 
         }
     
-
         //update homogenous edges A,B,C (no effect on failing test case)
         if (NV3 > 2) {
             Real64 const X_1(XTEMP(1));
@@ -4152,7 +4161,7 @@ namespace SolarShading {
             return false;
         }
        
-        Real64 threshold = 10;
+        Real64 threshold = 12;
         for (int offset = 0; offset < al1; offset++ )
         {
             bool isEqual = true;
