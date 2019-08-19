@@ -700,11 +700,7 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                 } else {
                     SendSurfTemp = SurfaceTemp(SendSurfNum);
                 }
-#ifdef EP_HBIRE_SEQ
                 SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] = pow_4(SendSurfTemp + KelvinConv);
-#else
-                SendSurfaceTempInKto4thPrecalc(SendSurfNum) = pow_4(SendSurfTemp + KelvinConv);
-#endif
 
                 int RecSurfNum = zone_SurfacePtr[SendZoneSurfNum];
                 if (construct.WindowTypeEQL) {
@@ -790,30 +786,27 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                     netLWRadToRecSurf += IRfromParentZone_acc - netLWRadToRecSurf_cor - (scriptF_acc * RecSurfTempInKTo4th);
                     surface_window.IRfromParentZone += IRfromParentZone_acc / RecSurfEmiss;
                 } else {
-                    size_type lsr_save = lSR;
+                    
                     Real64 netLWRadToRecSurf_acc_1(0.0); // Local accumulator
                     for (size_type k = 0; k < s_zone_Surfaces/4*4; k+=4, lSR+=4) {
                         __m256d r = _mm256_broadcast_sd(&RecSurfTempInKTo4th); //Faster inside for some reason
-                        __m256d s = _mm256_loadu_pd(SendSurfaceTempInKto4thPrecalc.data() + k);
-                        __m256d v = _mm256_mul_pd(_mm256_loadu_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
+                        __m256d s = _mm256_load_pd(SendSurfaceTempInKto4thPrecalc.data() + k);
+                        __m256d v = _mm256_mul_pd(_mm256_load_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
                         //Add V horizontally
-                       
 
-                        
+
+                        //double arr[4];
+                        //_mm256_storeu_pd(arr, v);
+                        //netLWRadToRecSurf_acc_1 += arr[0] + arr[1] + arr[2] + arr[3];
                         __m128d vlow  = _mm256_castpd256_pd128(v);
                         __m128d vhigh = _mm256_extractf128_pd(v, 1); // high 128
                         vlow  = _mm_add_pd(vlow, vhigh);     // reduce down to 128
                         netLWRadToRecSurf_acc_1 += _mm_cvtsd_f64(_mm_add_sd(vlow, _mm_unpackhi_pd(vlow, vlow)));
                         
-                        
                     }
-                    for (size_type k = s_zone_Surfaces/4*4; k < s_zone_Surfaces; ++k, ++lSR) {
-                        netLWRadToRecSurf_acc_1 += 
-                            zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[k] - RecSurfTempInKTo4th);
-                    }
+                   
                     netLWRadToRecSurf += netLWRadToRecSurf_acc_1 - (zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
                             * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th));
-                    
                 }
             }
         }
@@ -835,7 +828,7 @@ void CalcInteriorRadExchange(Array1S<Real64> const SurfaceTemp,   // Current sur
 	auto stop = std::chrono::high_resolution_clock::now(); 
 	auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
 	duration_count += duration.count();
-    //std::cout << duration_count << "\n";
+    std::cout << duration_count << "\n";
 
 }
 
