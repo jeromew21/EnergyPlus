@@ -492,14 +492,14 @@ namespace HeatBalanceIntRadExchange {
 #endif
     }
 
-void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Current surface temperatures
+    void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Current surface temperatures
                                  int const SurfIterations,            // Number of iterations in calling subroutine
                                  Array1<Real64> &NetLWRadToSurf,      // Net long wavelength radiant exchange from other surfaces
                                  Optional_int_const ZoneToResimulate, // if passed in, then only calculate for this zone
 #ifdef EP_Count_Calls
-        std::string const &CalledFrom)
+                                 std::string const &CalledFrom)
 #else
-        std::string const &EP_UNUSED(CalledFrom))
+                                 std::string const &EP_UNUSED(CalledFrom))
 #endif
     {
 
@@ -560,9 +560,8 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
         epStartTime("CalcInteriorRadExchange=");
 #endif
         if (CalcInteriorRadExchangefirstTime) {
-            InitInteriorRadExchange();
 #ifdef EP_HBIRE_SEQ
-            SendSurfaceTempInKto4thPrecalc.allocate(MaxNumOfZoneSurfaces);
+            SendSurfaceTempInKto4thPrecalc.allocate(MaxNumOfRadEnclosureSurfs);
 #else
             SendSurfaceTempInKto4thPrecalc.allocate(TotSurfaces);
 #endif
@@ -596,23 +595,24 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
 #endif
 
         ConstrNumRec = 0;
+        int startEnclosure = 1;
+        int endEnclosure = DataViewFactorInformation::NumOfRadiantEnclosures;
         if (PartialResimulate) {
-            auto const &zone(Zone(ZoneToResimulate));
-            NetLWRadToSurf({zone.SurfaceFirst, zone.SurfaceLast}) = 0.0;
-            for (int i = zone.SurfaceFirst; i <= zone.SurfaceLast; ++i)
+            startEnclosure = endEnclosure = Zone(ZoneToResimulate).RadiantEnclosureNum;
+            auto const &enclosure(ZoneRadiantInfo(startEnclosure));
+            for (int i : enclosure.SurfacePtr) {
+                NetLWRadToSurf(i) = 0.0;
                 SurfaceWindow(i).IRfromParentZone = 0.0;
+            }
         } else {
             NetLWRadToSurf = 0.0;
             for (auto &e : SurfaceWindow)
                 e.IRfromParentZone = 0.0;
         }
 
-        for (int ZoneNum = (PartialResimulate ? ZoneToResimulate() : 1), ZoneNum_end = (PartialResimulate ? ZoneToResimulate() : NumOfZones);
-             ZoneNum <= ZoneNum_end;
-             ++ZoneNum) {
+        for (int enclosureNum = startEnclosure; enclosureNum <= endEnclosure; ++enclosureNum) {
 
-            auto const &zone(Zone(ZoneNum));
-            auto &zone_info(ZoneInfo(ZoneNum));
+            auto &zone_info(ZoneRadiantInfo(enclosureNum));
             auto &zone_ScriptF(zone_info.ScriptF); // Tuned Transposed
             auto &zone_SurfacePtr(zone_info.SurfacePtr);
             int const n_zone_Surfaces(zone_info.NumOfSurfaces);
@@ -644,7 +644,8 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                 IntMovInsulChanged = false;
 
                 if (!BeginEnvrnFlag) { // Check for change in shade/blind status
-                    for (SurfNum = zone.SurfaceFirst; SurfNum <= zone.SurfaceLast; ++SurfNum) {
+                    for (int surfCounter = 1; surfCounter <= zone_info.NumOfSurfaces; ++surfCounter) {
+                        SurfNum = zone_info.SurfacePtr(surfCounter);
                         if (IntShadeOrBlindStatusChanged || IntMovInsulChanged)
                             break; // Need only check if one window's status or one movable insulation status has changed
                         ConstrNum = Surface(SurfNum).Construction;
@@ -655,6 +656,10 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                                 (ShadeFlagPrev != IntBlindOn && ShadeFlag == IntBlindOn) ||
                                 (ShadeFlagPrev == IntShadeOn && ShadeFlag != IntShadeOn) || (ShadeFlagPrev == IntBlindOn && ShadeFlag != IntBlindOn))
                                 IntShadeOrBlindStatusChanged = true;
+                            if (SurfaceWindow(SurfNum).WindowModelType == WindowEQLModel &&
+                                DataWindowEquivalentLayer::CFS(Construct(ConstrNum).EQLConsPtr).ISControlled) {
+                                IntShadeOrBlindStatusChanged = true;
+                            }
                         } else {
                             UpdateMovableInsulationFlag(IntMovInsulChanged, SurfNum);
                         }
@@ -676,6 +681,10 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                         if (Surface(SurfNum).MovInsulIntPresent) {
                             HeatBalanceMovableInsulation::EvalInsideMovableInsulation(SurfNum, HMovInsul, AbsInt);
                             zone_info.Emissivity(ZoneSurfNum) = Material(Surface(SurfNum).MaterialMovInsulInt).AbsorpThermal;
+                        }
+                        if (surface_window.WindowModelType == WindowEQLModel &&
+                            DataWindowEquivalentLayer::CFS(Construct(ConstrNum).EQLConsPtr).ISControlled) {
+                            zone_info.Emissivity(ZoneSurfNum) = EQLWindowInsideEffectiveEmiss(ConstrNum);
                         }
                     }
 
@@ -789,14 +798,17 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                     netLWRadToRecSurf += IRfromParentZone_acc - netLWRadToRecSurf_cor - (scriptF_acc * RecSurfTempInKTo4th);
                     surface_window.IRfromParentZone += IRfromParentZone_acc / RecSurfEmiss;
                 } else {
+                    /*
                     Real64 netLWRadToRecSurf_acc_1(0.0); // Local accumulator
                     for (size_type k = 0; k < s_zone_Surfaces/4*4; k+=4, lSR+=4) {
+                        
                         __m256d r = _mm256_broadcast_sd(&RecSurfTempInKTo4th); //Faster inside for some reason
                         __m256d s = _mm256_load_pd(SendSurfaceTempInKto4thPrecalc.data() + k);
                         __m256d v = _mm256_mul_pd(_mm256_load_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
                         //Add V horizontally
 
-
+                        netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
+                                                                          RecSurfTempInKTo4th);
                         double arr[4];
                         _mm256_storeu_pd(arr, v);
                         netLWRadToRecSurf_acc_1 += arr[0] + arr[1] + arr[2] + arr[3];
@@ -806,7 +818,7 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                         //netLWRadToRecSurf_acc_1 += _mm_cvtsd_f64(_mm_add_sd(vlow, _mm_unpackhi_pd(vlow, vlow)));
                         
 
-                       // += zone_ScriptF[lSR  ] * (SendSurfaceTempInKto4thPrecalc[k  ] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
+                       netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR  ] * (SendSurfaceTempInKto4thPrecalc[k  ] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
                        //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+1] * (SendSurfaceTempInKto4thPrecalc[k+1] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
                        //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+2] * (SendSurfaceTempInKto4thPrecalc[k+2] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
                        //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+3] * (SendSurfaceTempInKto4thPrecalc[k+3] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
@@ -817,6 +829,39 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
                     }
                     netLWRadToRecSurf += netLWRadToRecSurf_acc_1 - (zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
                             * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th));
+                    */
+                    Real64 netLWRadToRecSurf_acc(0.0); // Local accumulator
+                    
+                    __m256d r = _mm256_broadcast_sd(&RecSurfTempInKTo4th); //Faster inside for some reason
+
+                    for (size_type SendZoneSurfNum = 0; SendZoneSurfNum < s_zone_Surfaces/4*4; SendZoneSurfNum+=4, lSR+=4) {
+                        __m256d s = _mm256_load_pd(SendSurfaceTempInKto4thPrecalc.data() + SendZoneSurfNum);
+                        __m256d v = _mm256_mul_pd(_mm256_load_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
+                        
+                        __m128d vlow  = _mm256_castpd256_pd128(v);
+                        __m128d vhigh = _mm256_extractf128_pd(v, 1); // high 128
+                        vlow  = _mm_add_pd(vlow, vhigh);     // reduce down to 128
+                        netLWRadToRecSurf_acc += _mm_cvtsd_f64(_mm_add_sd(vlow, _mm_unpackhi_pd(vlow, vlow)));
+                        /*
+                         double arr[4];
+                        _mm256_storeu_pd(arr, v);
+                        netLWRadToRecSurf_acc += arr[0] + arr[1] + arr[2] + arr[3];
+                        netLWRadToRecSurf_acc += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] - RecSurfTempInKTo4th);
+                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+1] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+1] - RecSurfTempInKTo4th);
+                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+2] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+2] - RecSurfTempInKTo4th);
+                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+3] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+3] - RecSurfTempInKTo4th);
+                        */
+                    }
+                    for (size_type SendZoneSurfNum = s_zone_Surfaces/4*4; SendZoneSurfNum < s_zone_Surfaces; ++SendZoneSurfNum, ++lSR) {
+                        //if (RecZoneSurfNum != SendZoneSurfNum) {
+                            netLWRadToRecSurf_acc += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
+                                                                          RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
+
+                        //}
+                    }
+                    netLWRadToRecSurf += netLWRadToRecSurf_acc - (zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
+                            * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th));
+                    
                 }
             }
         }
@@ -827,12 +872,12 @@ void CalcInteriorRadExchange_test(Array1S<Real64> const SurfaceTemp,   // Curren
     }
 
 
-void CalcInteriorRadExchange(Array1S<Real64> const SurfaceTemp,   // Current surface temperatures
-                                 int const SurfIterations,            // Number of iterations in calling subroutine
-                                 Array1<Real64> &NetLWRadToSurf,      // Net long wavelength radiant exchange from other surfaces
-                                 Optional_int_const ZoneToResimulate, std::string const &CalledFrom) { 
-	CalcInteriorRadExchange_test(SurfaceTemp, SurfIterations, NetLWRadToSurf, ZoneToResimulate, CalledFrom);
-}
+    void CalcInteriorRadExchange(Array1S<Real64> const SurfaceTemp,   // Current surface temperatures
+                                    int const SurfIterations,            // Number of iterations in calling subroutine
+                                    Array1<Real64> &NetLWRadToSurf,      // Net long wavelength radiant exchange from other surfaces
+                                    Optional_int_const ZoneToResimulate, std::string const &CalledFrom) { 
+        CalcInteriorRadExchange_test(SurfaceTemp, SurfIterations, NetLWRadToSurf, ZoneToResimulate, CalledFrom);
+    }
 
     void UpdateMovableInsulationFlag(bool &MovableInsulationChange, int const SurfNum)
     {
