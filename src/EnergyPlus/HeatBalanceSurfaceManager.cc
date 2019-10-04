@@ -5172,10 +5172,7 @@ namespace HeatBalanceSurfaceManager {
             CalcInteriorRadExchange(TH(2, 1, _), 0, NetLWRadToSurf, _, Outside);
         }
 
-       //#pragma omp parallel for
-        //std::cout << "START CalcHeatBalanceOutsideSurf\n";
-        //#pragma omp parallel for
-        static int one1, branchB1, branchB2, four4, five5, six6, seven7,elseE;
+        #pragma omp parallel for
         for (int SurfNum = 1; SurfNum <= TotSurfaces; ++SurfNum) { // Loop through all surfaces...
             //std::cout << "ITER" << SurfNum << "\n";
             int OPtr;
@@ -5231,7 +5228,6 @@ namespace HeatBalanceSurfaceManager {
                 auto const SELECT_CASE_var(Surface(SurfNum).ExtBoundCond);
 
                 if (SELECT_CASE_var == Ground) { // Surface in contact with ground
-                    one1 ++;
 
                     TH(1, 1, SurfNum) = GroundTemp;
 
@@ -5274,7 +5270,6 @@ namespace HeatBalanceSurfaceManager {
 
                     // Added for FCfactor grounds
                 } else if (SELECT_CASE_var == GroundFCfactorMethod) { // Surface in contact with ground
-                    branchB1 ++;
                     TH(1, 1, SurfNum) = GroundTempFC;
 
                     // Set the only radiant system heat balance coefficient that is non-zero for this case
@@ -5315,7 +5310,6 @@ namespace HeatBalanceSurfaceManager {
                 } else if (SELECT_CASE_var == OtherSideCoefNoCalcExt) {
                     // Use Other Side Coefficients to determine the surface film coefficient and
                     // the exterior boundary condition temperature
-                    branchB2 ++;
                     OPtr = Surface(SurfNum).OSCPtr;
                     // Set surface temp from previous timestep
                     if (BeginTimeStepFlag) {
@@ -5368,7 +5362,6 @@ namespace HeatBalanceSurfaceManager {
                     // This ends the calculations for this surface and goes on to the next SurfNum
 
                 } else if (SELECT_CASE_var == OtherSideCoefCalcExt) { // A surface with other side coefficients that define the outside environment
-                    four4 ++;
                     // First, set up the outside convection coefficient and the exterior temperature
                     // boundary condition for the surface
                     OPtr = Surface(SurfNum).OSCPtr;
@@ -5425,7 +5418,6 @@ namespace HeatBalanceSurfaceManager {
                     // This ends the calculations for this surface and goes on to the next SurfNum
 
                 } else if (SELECT_CASE_var == OtherSideCondModeledExt) { // A surface with other side conditions determined from seperate, dynamic component
-                    five5 ++;
                     //                               modeling that defines the "outside environment"
 
                     // First, set up the outside convection coefficient and the exterior temperature
@@ -5480,7 +5472,6 @@ namespace HeatBalanceSurfaceManager {
 
                     // This ends the calculations for this surface and goes on to the next SurfNum
                 } else if (SELECT_CASE_var == ExternalEnvironment) {
-                    six6 ++;
                     // checking the EcoRoof presented in the external environment
                     // recompute each load by calling ecoroof
 
@@ -5640,7 +5631,6 @@ namespace HeatBalanceSurfaceManager {
                     }
 
                 } else if (SELECT_CASE_var == KivaFoundation) {
-                    seven7 ++;
                     RoughSurf = Material(Construct(ConstrNum).LayerPoint(1)).Roughness;
                     AbsThermSurf = Material(Construct(ConstrNum).LayerPoint(1)).AbsorpThermal;
 
@@ -5656,9 +5646,7 @@ namespace HeatBalanceSurfaceManager {
                                                 HAirExtSurf(SurfNum));
 
                 } else { // for interior or other zone surfaces
-                    elseE ++;
                     if (Surface(SurfNum).ExtBoundCond == SurfNum) { // Regular partition/internal mass
-                        branchB1++;
                         TH(1, 1, SurfNum) = TempSurfIn(SurfNum);
 
                         // No need to set any radiant system heat balance coefficients here--will be done during inside heat balance
@@ -5682,7 +5670,6 @@ namespace HeatBalanceSurfaceManager {
                         }
 
                     } else { // Interzone partition
-                        branchB2 ++;
                         TH(1, 1, SurfNum) = TH(2, 1, Surface(SurfNum).ExtBoundCond);
 
                         // No need to set any radiant system heat balance coefficients here--will be done during inside heat balance
@@ -5720,15 +5707,7 @@ namespace HeatBalanceSurfaceManager {
             }
             QConvOutReport(SurfNum) = QdotConvOutRep(SurfNum) * TimeStepZoneSec;
         } // ...end of DO loop over all surface (actually heat transfer surfaces)
-        //std::cout << "END CalcHeatBalanceOutsideSurf\n";
-        std::cout << "one1 = " << one1 << "\n";
-        std::cout << "branchB1 = " << branchB1 << "\n";
-        std::cout << "branchB2 = " << branchB2 << "\n";
-        std::cout << "four4 = " << four4 << "\n";
-        std::cout << "five5 = " << five5 << "\n";
-        std::cout << "six6 = " << six6 << "\n";
-        std::cout << "seven7 = " << seven7 << "\n";
-        std::cout << "elseE = " << elseE << "\n";
+        
     }
 
     void CalcHeatBalanceOutsideSurf(Optional_int_const ZoneToResimulate) // if passed in, then only calculate surfaces that have this zone
@@ -5739,8 +5718,7 @@ namespace HeatBalanceSurfaceManager {
         CalcHeatBalanceOutsideSurf_test(ZoneToResimulate);
         auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start); //or milliseconds
         duration_count += duration.count();
-        std::cout << duration_count << "\n";
-        //exit(0);
+        //std::cout << duration_count << "\n";
     }
 
     void CalcHeatBalanceInsideSurf(Optional_int_const ZoneToResimulate) // if passed in, then only calculate surfaces that have this zone
