@@ -783,70 +783,36 @@ namespace HeatBalanceIntRadExchange {
                     netLWRadToRecSurf += IRfromParentZone_acc - netLWRadToRecSurf_cor - (scriptF_acc * RecSurfTempInKTo4th);
                     surface_window.IRfromParentZone += IRfromParentZone_acc / RecSurfEmiss;
                 } else {
-                    /*
-                    Real64 netLWRadToRecSurf_acc_1(0.0); // Local accumulator
-                    for (size_type k = 0; k < s_zone_Surfaces/4*4; k+=4, lSR+=4) {
-                        
-                        __m256d r = _mm256_broadcast_sd(&RecSurfTempInKTo4th); //Faster inside for some reason
-                        __m256d s = _mm256_load_pd(SendSurfaceTempInKto4thPrecalc.data() + k);
-                        __m256d v = _mm256_mul_pd(_mm256_load_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
-                        //Add V horizontally
+                    //Vector refactor
 
-                        netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
-                                                                          RecSurfTempInKTo4th);
-                        double arr[4];
-                        _mm256_storeu_pd(arr, v);
-                        netLWRadToRecSurf_acc_1 += arr[0] + arr[1] + arr[2] + arr[3];
-                        //__m128d vlow  = _mm256_castpd256_pd128(v);
-                        //__m128d vhigh = _mm256_extractf128_pd(v, 1); // high 128
-                        //vlow  = _mm_add_pd(vlow, vhigh);     // reduce down to 128
-                        //netLWRadToRecSurf_acc_1 += _mm_cvtsd_f64(_mm_add_sd(vlow, _mm_unpackhi_pd(vlow, vlow)));
-                        
-
-                       netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR  ] * (SendSurfaceTempInKto4thPrecalc[k  ] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
-                       //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+1] * (SendSurfaceTempInKto4thPrecalc[k+1] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
-                       //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+2] * (SendSurfaceTempInKto4thPrecalc[k+2] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
-                       //netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR+3] * (SendSurfaceTempInKto4thPrecalc[k+3] - RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
-                    }
-                    for (size_type SendZoneSurfNum = s_zone_Surfaces/4*4; SendZoneSurfNum < s_zone_Surfaces; ++SendZoneSurfNum, ++lSR) {
-                            netLWRadToRecSurf_acc_1 += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
-                                                                          RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
-                    }
-                    netLWRadToRecSurf += netLWRadToRecSurf_acc_1 - (zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
-                            * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th));
-                    */
                     Real64 netLWRadToRecSurf_acc(0.0); // Local accumulator
                     
                     __m256d r = _mm256_broadcast_sd(&RecSurfTempInKTo4th); //Faster inside for some reason
+
+                    __m256d accum = _mm256_setzero_pd();
 
                     for (size_type SendZoneSurfNum = 0; SendZoneSurfNum < s_zone_Surfaces/4*4; SendZoneSurfNum+=4, lSR+=4) {
                         __m256d s = _mm256_load_pd(SendSurfaceTempInKto4thPrecalc.data() + SendZoneSurfNum);
                         __m256d v = _mm256_mul_pd(_mm256_load_pd(zone_ScriptF.data() + lSR), _mm256_sub_pd(s, r));
                         
-                        __m128d vlow  = _mm256_castpd256_pd128(v);
-                        __m128d vhigh = _mm256_extractf128_pd(v, 1); // high 128
-                        vlow  = _mm_add_pd(vlow, vhigh);     // reduce down to 128
-                        netLWRadToRecSurf_acc += _mm_cvtsd_f64(_mm_add_sd(vlow, _mm_unpackhi_pd(vlow, vlow)));
-                        /*
-                         double arr[4];
-                        _mm256_storeu_pd(arr, v);
-                        netLWRadToRecSurf_acc += arr[0] + arr[1] + arr[2] + arr[3];
-                        netLWRadToRecSurf_acc += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] - RecSurfTempInKTo4th);
-                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+1] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+1] - RecSurfTempInKTo4th);
-                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+2] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+2] - RecSurfTempInKTo4th);
-                        netLWRadToRecSurf_acc += zone_ScriptF[lSR+3] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum+3] - RecSurfTempInKTo4th);
-                        */
+                        accum = _mm256_add_pd(accum, v);
                     }
-                    for (size_type SendZoneSurfNum = s_zone_Surfaces/4*4; SendZoneSurfNum < s_zone_Surfaces; ++SendZoneSurfNum, ++lSR) {
-                        //if (RecZoneSurfNum != SendZoneSurfNum) {
-                            netLWRadToRecSurf_acc += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
-                                                                          RecSurfTempInKTo4th); // [ lSR ] == ( SendZoneSurfNum+1, RecZoneSurfNum+1 )
 
-                        //}
+                    //store vector sum
+                    double accum_arr[4];
+                    _mm256_storeu_pd(accum_arr, accum);
+                    netLWRadToRecSurf_acc += accum_arr[0] + accum_arr[1] + accum_arr[2] + accum_arr[3];
+
+                    //Tail
+                    for (size_type SendZoneSurfNum = s_zone_Surfaces/4*4; SendZoneSurfNum < s_zone_Surfaces; ++SendZoneSurfNum, ++lSR) {
+                            netLWRadToRecSurf_acc += zone_ScriptF[lSR] * (SendSurfaceTempInKto4thPrecalc[SendZoneSurfNum] -
+                                                                          RecSurfTempInKTo4th);
                     }
-                    netLWRadToRecSurf += netLWRadToRecSurf_acc - (zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
-                            * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th));
-                    
+
+                    netLWRadToRecSurf += netLWRadToRecSurf_acc - (
+                        zone_ScriptF[RecZoneSurfNum*s_zone_Surfaces+RecZoneSurfNum] 
+                            * (SendSurfaceTempInKto4thPrecalc[RecZoneSurfNum] - RecSurfTempInKTo4th)
+                    ); //Subtract the quantity what would have been not added in loop
                 }
             }
         }
